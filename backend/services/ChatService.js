@@ -14,8 +14,8 @@ const send = (ws, payload) => {
 
 const broadcastToRoom = async (roomId, payload, excludeUserId = null) => {
     try {
-        const [members] = await pool.query(
-            'SELECT user_id FROM chat_members WHERE room_id = ?',
+        const { rows: members } = await pool.query(
+            'SELECT user_id FROM chat_members WHERE room_id = $1',
             [roomId]
         );
         for (const member of members) {
@@ -31,7 +31,7 @@ const broadcastToRoom = async (roomId, payload, excludeUserId = null) => {
 const persistMessage = async ({ id, roomId, userId, text, attachments, parentId }) => {
     await pool.query(
         `INSERT INTO chat_messages (id, room_id, user_id, text, attachments, parent_id)
-         VALUES (?, ?, ?, ?, ?, ?)
+         VALUES ($1, $2, $3, $4, $5, $6)
          ON CONFLICT (id) DO NOTHING`,
         [id, roomId, userId, text, JSON.stringify(attachments || []), parentId || null]
     );
@@ -72,8 +72,8 @@ export const handleConnection = (ws, req) => {
                     if (!roomId || !text?.trim()) return;
 
                     // Verify user is a member of this room
-                    const [membership] = await pool.query(
-                        'SELECT id FROM chat_members WHERE room_id = ? AND user_id = ?',
+                    const { rows: membership } = await pool.query(
+                        'SELECT id FROM chat_members WHERE room_id = $1 AND user_id = $2',
                         [roomId, user.id]
                     );
                     if (!membership.length) {
@@ -101,7 +101,7 @@ export const handleConnection = (ws, req) => {
                     );
 
                     // Update room updated_at
-                    pool.query('UPDATE chat_rooms SET updated_at = NOW() WHERE id = ?', [roomId])
+                    pool.query('UPDATE chat_rooms SET updated_at = NOW() WHERE id = $1', [roomId])
                         .catch(() => {});
                     break;
                 }
@@ -133,11 +133,11 @@ export const handleConnection = (ws, req) => {
                     const { roomId } = event;
                     if (!roomId) return;
                     // Fetch last 50 messages for this room
-                    const [messages] = await pool.query(
+                    const { rows: messages } = await pool.query(
                         `SELECT cm.*, p.username, p.first_name, p.last_name, p.profile_image
                          FROM chat_messages cm
                          LEFT JOIN profiles p ON cm.user_id = p.user_id
-                         WHERE cm.room_id = ? AND cm.deleted_at IS NULL
+                         WHERE cm.room_id = $1 AND cm.deleted_at IS NULL
                          ORDER BY cm.created_at DESC LIMIT 50`,
                         [roomId]
                     );

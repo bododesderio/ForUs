@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__plugin_claude-mem_mcp-search__get_observations",
+      "Bash(cat /e/projects/ForUs1/frontend/.env*)",
+      "Bash(find:*)",
+      "Bash(grep -v \"\\\\$[0-9]\\\\|?\")",
+      "Bash(grep -v '\\\\$')",
+      "Bash(wc -l /e/projects/ForUs1/backend/controllers/*.js)",
+      "Bash(wc -l /e/projects/ForUs1/frontend/src/services/*.* /e/projects/ForUs1/frontend/src/context/*.*)",
+      "mcp__plugin_claude-mem_mcp-search__smart_search"
+    ]
+  }
+}

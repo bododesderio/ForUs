@@ -10,20 +10,23 @@ export const createChatRoom = async (req, res) => {
 
         // Create room if it doesn't exist
         await pool.query(
-            'INSERT INTO chat_rooms (id, name, type, created_by) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE id = id',
+            `INSERT INTO chat_rooms (id, name, type, created_by) VALUES ($1, $2, $3, $4)
+             ON CONFLICT (id) DO NOTHING`,
             [roomId, name || roomId, type, createdBy]
         );
 
         // Add creator as owner
         await pool.query(
-            'INSERT IGNORE INTO chat_members (room_id, user_id, role) VALUES (?, ?, ?)',
+            `INSERT INTO chat_members (room_id, user_id, role) VALUES ($1, $2, $3)
+             ON CONFLICT (room_id, user_id) DO NOTHING`,
             [roomId, createdBy, 'owner']
         );
 
         // Add other members
         for (const member of members) {
             await pool.query(
-                'INSERT IGNORE INTO chat_members (room_id, user_id, role) VALUES (?, ?, ?)',
+                `INSERT INTO chat_members (room_id, user_id, role) VALUES ($1, $2, $3)
+                 ON CONFLICT (room_id, user_id) DO NOTHING`,
                 [roomId, member.user_id, member.role || 'member']
             );
         }
@@ -37,13 +40,13 @@ export const createChatRoom = async (req, res) => {
 
 export const getUserRooms = async (req, res) => {
     try {
-        const [rooms] = await pool.query(
+        const { rows: rooms } = await pool.query(
             `SELECT cr.id, cr.name, cr.type, cr.updated_at, cm.role, cm.joined_at,
                 (SELECT text FROM chat_messages WHERE room_id = cr.id AND deleted_at IS NULL ORDER BY created_at DESC LIMIT 1) as last_message,
                 (SELECT created_at FROM chat_messages WHERE room_id = cr.id AND deleted_at IS NULL ORDER BY created_at DESC LIMIT 1) as last_message_at
              FROM chat_rooms cr
              JOIN chat_members cm ON cr.id = cm.room_id
-             WHERE cm.user_id = ?
+             WHERE cm.user_id = $1
              ORDER BY cr.updated_at DESC`,
             [req.user.id]
         );
@@ -61,8 +64,8 @@ export const getRoomMessages = async (req, res) => {
         const before = req.query.before;
 
         // Verify membership
-        const [membership] = await pool.query(
-            'SELECT id FROM chat_members WHERE room_id = ? AND user_id = ?',
+        const { rows: membership } = await pool.query(
+            'SELECT id FROM chat_members WHERE room_id = $1 AND user_id = $2',
             [roomId, req.user.id]
         );
         if (!membership.length) {
@@ -73,19 +76,20 @@ export const getRoomMessages = async (req, res) => {
             SELECT cm.*, p.username, p.first_name, p.last_name, p.profile_image
             FROM chat_messages cm
             LEFT JOIN profiles p ON cm.user_id = p.user_id
-            WHERE cm.room_id = ? AND cm.deleted_at IS NULL
+            WHERE cm.room_id = $1 AND cm.deleted_at IS NULL
         `;
         const params = [roomId];
+        let paramIdx = 2;
 
         if (before) {
-            query += ' AND cm.created_at < ?';
+            query += ` AND cm.created_at < $${paramIdx++}`;
             params.push(before);
         }
 
-        query += ' ORDER BY cm.created_at DESC LIMIT ?';
+        query += ` ORDER BY cm.created_at DESC LIMIT $${paramIdx}`;
         params.push(limit);
 
-        const [messages] = await pool.query(query, params);
+        const { rows: messages } = await pool.query(query, params);
         res.json({ success: true, messages: messages.reverse() });
     } catch (error) {
         logger.error({ error }, 'getRoomMessages failed');
@@ -97,7 +101,8 @@ export const joinRoom = async (req, res) => {
     try {
         const { roomId } = req.params;
         await pool.query(
-            'INSERT IGNORE INTO chat_members (room_id, user_id, role) VALUES (?, ?, ?)',
+            `INSERT INTO chat_members (room_id, user_id, role) VALUES ($1, $2, $3)
+             ON CONFLICT (room_id, user_id) DO NOTHING`,
             [roomId, req.user.id, 'member']
         );
         res.json({ success: true, message: 'Joined room' });

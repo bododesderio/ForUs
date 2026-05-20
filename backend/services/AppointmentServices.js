@@ -1,11 +1,11 @@
 import { pool } from "../db/index.js";
 import { sendPushNotificationToUser, sendPushNotificationToConsultant } from './UserServices.js';
 
-// Cancel all expired appointments (pending/confirmed) whose start time is more than 15 minutes in the past (UTC)
+// Cancel all expired appointments (pending/confirmed) whose start time is more than 15 minutes in the past
 export const cancelExpiredAppointments = async () => {
     try {
-        const [appointments] = await pool.query(
-            `SELECT id, appointment_datetime, user_id, consultant_id FROM appointments 
+        const { rows: appointments } = await pool.query(
+            `SELECT id, appointment_datetime, user_id, consultant_id FROM appointments
              WHERE status IN ('pending', 'confirmed')`
         );
         const now = new Date();
@@ -21,9 +21,10 @@ export const cancelExpiredAppointments = async () => {
             }
         }
         if (expiredIds.length > 0) {
+            const placeholders = expiredIds.map((_, i) => `$${i + 1}`).join(',');
             await pool.query(
-                `UPDATE appointments SET status = 'cancelled', cancellation_reason = 'Missed/Expired', updated_at = CURRENT_TIMESTAMP WHERE id IN (?)`,
-                [expiredIds]
+                `UPDATE appointments SET status = 'cancelled', cancellation_reason = 'Missed/Expired', updated_at = CURRENT_TIMESTAMP WHERE id IN (${placeholders})`,
+                expiredIds
             );
             for (const appt of expiredAppointments) {
                 try {
@@ -54,9 +55,15 @@ export const cancelExpiredAppointments = async () => {
 
 export const createAppointment = async(appointment, user_id) => {
     try {
-        const [consultants] = await pool.query('SELECT * FROM consultants WHERE id = ?', [appointment.consultant_id]);
+        // Verify consultant exists (user with role='consultant')
+        const { rows: consultants } = await pool.query(
+            `SELECT u.id FROM users u
+             INNER JOIN consultant_details cd ON cd.user_id = u.id
+             WHERE u.id = $1 AND u.role = 'consultant' AND u.deleted_at IS NULL`,
+            [appointment.consultant_id]
+        );
         if (consultants.length === 0) {
-            return {success: false, message: "Consultant not found or inactive"}; 
+            return {success: false, message: "Consultant not found or inactive"};
         }
 
         const durationInMinutes = appointment.duration_minutes || 90;
@@ -66,14 +73,14 @@ export const createAppointment = async(appointment, user_id) => {
         }
         const appointmentDateTimeStr = appointmentDateTime.toISOString();
 
-        const [conflicts] = await pool.query(
-            `SELECT id FROM appointments 
-            WHERE consultant_id = ? 
-            AND status IN ('pending', 'confirmed', 'in_session') 
+        const { rows: conflicts } = await pool.query(
+            `SELECT id FROM appointments
+            WHERE consultant_id = $1
+            AND status IN ('pending', 'confirmed', 'in_session')
             AND (
-                (appointment_datetime <= ? AND DATE_ADD(appointment_datetime, INTERVAL duration_minutes MINUTE) > ?)
+                (appointment_datetime <= $2 AND appointment_datetime + (duration_minutes || ' minutes')::interval > $3)
                 OR
-                (appointment_datetime < ? AND DATE_ADD(appointment_datetime, INTERVAL duration_minutes MINUTE) >= ?)
+                (appointment_datetime < $4 AND appointment_datetime + (duration_minutes || ' minutes')::interval >= $5)
             )`,
             [
                 appointment.consultant_id,
@@ -88,25 +95,25 @@ export const createAppointment = async(appointment, user_id) => {
             return {success: false, message: "Time slot is already booked"};
         }
 
-        const [result] = await pool.query(
-            `INSERT INTO appointments (user_id, consultant_id, title, description, appointment_datetime, duration_minutes, status, mood, created_at) 
-            VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, NOW())`,
+        const { rows } = await pool.query(
+            `INSERT INTO appointments (user_id, consultant_id, title, description, appointment_datetime, duration_minutes, status, mood)
+            VALUES ($1, $2, $3, $4, $5, $6, 'pending', $7) RETURNING id`,
             [
-                user_id, 
-                appointment.consultant_id, 
-                appointment.title, 
-                appointment.description || null, 
-                appointmentDateTimeStr, 
+                user_id,
+                appointment.consultant_id,
+                appointment.title,
+                appointment.description || null,
+                appointmentDateTimeStr,
                 durationInMinutes,
                 appointment.mood || null
             ]
         );
-        
+
         return {
             success: true,
             message: 'Appointment created successfully',
             appointment: {
-                id: result.insertId,
+                id: rows[0].id,
                 ...appointment,
                 user_id,
                 status: 'pending',
@@ -128,173 +135,168 @@ export const getAppointments = async (userId, userType, appointment = {}) => {
     try {
         await cancelExpiredAppointments();
 
-        let query, params, countQuery, countParams;
+        let query, countQuery;
+        let params = [];
+        let countParams = [];
+        let paramIdx = 1;
+        let countParamIdx = 1;
 
         if (userType === 'user') {
             query = `
-                SELECT 
-                    a.*, 
-                    CONCAT(c.first_name, ' ', c.last_name) as consultant_name, 
-                    c.email as consultant_email, 
-                    c.phone as consultant_phone, 
-                    c.profile_image, 
-                    c.dob,
-                    c.gender,
+                SELECT
+                    a.*,
+                    CONCAT(p.first_name, ' ', p.last_name) as consultant_name,
+                    u2.email as consultant_email,
+                    p.phone as consultant_phone,
+                    p.profile_image,
+                    p.dob,
+                    p.gender,
                     r.id as review_id,
                     r.rating,
                     r.review_text,
                     r.created_at as review_date
                 FROM appointments a
-                LEFT JOIN consultants c ON a.consultant_id = c.id
+                LEFT JOIN users u2 ON a.consultant_id = u2.id
+                LEFT JOIN profiles p ON p.user_id = u2.id
                 LEFT JOIN reviews r ON a.id = r.appointment_id
-                WHERE a.user_id = ?
+                WHERE a.user_id = $${paramIdx}
             `;
-            
             countQuery = `
                 SELECT COUNT(DISTINCT a.id) as total
                 FROM appointments a
-                LEFT JOIN consultants c ON a.consultant_id = c.id
                 LEFT JOIN reviews r ON a.id = r.appointment_id
-                WHERE a.user_id = ?
+                WHERE a.user_id = $${countParamIdx}
             `;
-            
-            params = [userId];
-            countParams = [userId];
+            params.push(userId);
+            countParams.push(userId);
+            paramIdx++;
+            countParamIdx++;
         } else if (userType === 'consultant') {
             query = `
-                SELECT 
-                    a.*, 
-                    CONCAT(u.first_name, ' ', u.last_name) as user_name, 
-                    u.email as user_email, 
-                    u.phone as user_phone, 
-                    u.profile_image, 
-                    u.dob,
-                    u.gender,
+                SELECT
+                    a.*,
+                    CONCAT(p.first_name, ' ', p.last_name) as user_name,
+                    u2.email as user_email,
+                    p.phone as user_phone,
+                    p.profile_image,
+                    p.dob,
+                    p.gender,
                     r.id as review_id,
                     r.rating,
                     r.review_text,
                     r.created_at as review_date
                 FROM appointments a
-                LEFT JOIN users u ON a.user_id = u.id
+                LEFT JOIN users u2 ON a.user_id = u2.id
+                LEFT JOIN profiles p ON p.user_id = u2.id
                 LEFT JOIN reviews r ON a.id = r.appointment_id
-                WHERE a.consultant_id = ?
+                WHERE a.consultant_id = $${paramIdx}
             `;
-            
             countQuery = `
                 SELECT COUNT(DISTINCT a.id) as total
                 FROM appointments a
-                LEFT JOIN users u ON a.user_id = u.id
                 LEFT JOIN reviews r ON a.id = r.appointment_id
-                WHERE a.consultant_id = ?
+                WHERE a.consultant_id = $${countParamIdx}
             `;
-            
-            params = [userId];
-            countParams = [userId];
+            params.push(userId);
+            countParams.push(userId);
+            paramIdx++;
+            countParamIdx++;
         } else if (userType === 'admin') {
             query = `
-                SELECT 
-                    a.*, 
-                    CONCAT(u.first_name, ' ', u.last_name) as user_name, 
-                    u.email as user_email, 
-                    u.phone as user_phone, 
-                    u.profile_image as user_profile_image, 
-                    u.dob as user_dob,
-                    u.gender as user_gender,
-                    CONCAT(c.first_name, ' ', c.last_name) as consultant_name, 
-                    c.email as consultant_email, 
-                    c.phone as consultant_phone, 
-                    c.profile_image as consultant_profile_image, 
-                    c.dob as consultant_dob,
-                    c.gender as consultant_gender,
+                SELECT
+                    a.*,
+                    CONCAT(pu.first_name, ' ', pu.last_name) as user_name,
+                    uu.email as user_email,
+                    pu.phone as user_phone,
+                    pu.profile_image as user_profile_image,
+                    pu.dob as user_dob,
+                    pu.gender as user_gender,
+                    CONCAT(pc.first_name, ' ', pc.last_name) as consultant_name,
+                    uc.email as consultant_email,
+                    pc.phone as consultant_phone,
+                    pc.profile_image as consultant_profile_image,
+                    pc.dob as consultant_dob,
+                    pc.gender as consultant_gender,
                     r.id as review_id,
                     r.rating,
                     r.review_text,
                     r.created_at as review_date
                 FROM appointments a
-                LEFT JOIN users u ON a.user_id = u.id
-                LEFT JOIN consultants c ON a.consultant_id = c.id
+                LEFT JOIN users uu ON a.user_id = uu.id
+                LEFT JOIN profiles pu ON pu.user_id = uu.id
+                LEFT JOIN users uc ON a.consultant_id = uc.id
+                LEFT JOIN profiles pc ON pc.user_id = uc.id
                 LEFT JOIN reviews r ON a.id = r.appointment_id
             `;
-            
             countQuery = `
                 SELECT COUNT(DISTINCT a.id) as total
                 FROM appointments a
-                LEFT JOIN users u ON a.user_id = u.id
-                LEFT JOIN consultants c ON a.consultant_id = c.id
                 LEFT JOIN reviews r ON a.id = r.appointment_id
             `;
-            
-            params = [];
-            countParams = [];
         }
 
-        // Apply filters (status, date filters, etc.)
+        // Apply filters
+        const hasBaseWhere = userType !== 'admin';
+
         if (appointment.status) {
             const statuses = appointment.status.split(',').map(s => s.trim());
-            const statusPlaceholders = statuses.map(() => '?').join(',');
-            const statusCondition = ` ${userType === 'admin' ? 'WHERE' : 'AND'} a.status IN (${statusPlaceholders})`;
-            query += statusCondition;
-            countQuery += statusCondition;
+            const statusPlaceholders = statuses.map(() => `$${paramIdx++}`).join(',');
+            const countStatusPlaceholders = statuses.map(() => `$${countParamIdx++}`).join(',');
+            query += ` ${hasBaseWhere ? 'AND' : 'WHERE'} a.status IN (${statusPlaceholders})`;
+            countQuery += ` ${hasBaseWhere ? 'AND' : 'WHERE'} a.status IN (${countStatusPlaceholders})`;
             params.push(...statuses);
             countParams.push(...statuses);
         }
 
-        const hasWhere = userType !== 'admin' || appointment.status;
+        const hasWhere = hasBaseWhere || !!appointment.status;
 
         if (appointment.date_from) {
-            const dateCondition = ` ${hasWhere ? 'AND' : 'WHERE'} a.appointment_datetime >= ?`;
-            query += dateCondition;
-            countQuery += dateCondition;
+            query += ` ${hasWhere ? 'AND' : 'WHERE'} a.appointment_datetime >= $${paramIdx++}`;
+            countQuery += ` ${hasWhere ? 'AND' : 'WHERE'} a.appointment_datetime >= $${countParamIdx++}`;
             params.push(appointment.date_from);
             countParams.push(appointment.date_from);
         }
 
         if (appointment.date_to) {
-            const dateCondition = ` ${hasWhere || appointment.date_from ? 'AND' : 'WHERE'} a.appointment_datetime <= ?`;
-            query += dateCondition;
-            countQuery += dateCondition;
+            query += ` AND a.appointment_datetime <= $${paramIdx++}`;
+            countQuery += ` AND a.appointment_datetime <= $${countParamIdx++}`;
             params.push(appointment.date_to);
             countParams.push(appointment.date_to);
         }
 
         if (appointment.date) {
-            const dateCondition = ` ${hasWhere || appointment.date_from || appointment.date_to ? 'AND' : 'WHERE'} DATE(a.appointment_datetime) = ?`;
-            query += dateCondition;
-            countQuery += dateCondition;
+            query += ` ${hasWhere || appointment.date_from || appointment.date_to ? 'AND' : 'WHERE'} a.appointment_datetime::date = $${paramIdx++}`;
+            countQuery += ` ${hasWhere || appointment.date_from || appointment.date_to ? 'AND' : 'WHERE'} a.appointment_datetime::date = $${countParamIdx++}`;
             params.push(appointment.date);
             countParams.push(appointment.date);
         }
 
         if (appointment.reviewed === 'true') {
-            const reviewCondition = ` ${hasWhere || appointment.date_from || appointment.date_to || appointment.date ? 'AND' : 'WHERE'} r.id IS NOT NULL`;
-            query += reviewCondition;
-            countQuery += reviewCondition;
+            query += ` AND r.id IS NOT NULL`;
+            countQuery += ` AND r.id IS NOT NULL`;
         } else if (appointment.reviewed === 'false') {
-            const reviewCondition = ` ${hasWhere || appointment.date_from || appointment.date_to || appointment.date ? 'AND' : 'WHERE'} r.id IS NULL`;
-            query += reviewCondition;
-            countQuery += reviewCondition;
+            query += ` AND r.id IS NULL`;
+            countQuery += ` AND r.id IS NULL`;
         }
 
         query += ' ORDER BY a.appointment_datetime DESC';
 
         const page = parseInt(appointment.page) || 1;
-        const limit = userType === 'admin' ? parseInt(appointment.limit) || 100 : parseInt(appointment.limit) || 10; // Higher default limit for admin
+        const limit = userType === 'admin' ? parseInt(appointment.limit) || 100 : parseInt(appointment.limit) || 10;
         const offset = (page - 1) * limit;
 
-        query += ' LIMIT ? OFFSET ?';
+        query += ` LIMIT $${paramIdx++} OFFSET $${paramIdx++}`;
         params.push(limit, offset);
 
-        const [appointments] = await pool.query(query, params);
-        
+        const { rows: appointments } = await pool.query(query, params);
+
         let total = 0;
         if (appointment.include_total === 'true' || userType === 'admin') {
-            const [countResult] = await pool.query(countQuery, countParams);
-            total = countResult[0].total;
+            const { rows: countResult } = await pool.query(countQuery, countParams);
+            total = parseInt(countResult[0].total);
         }
 
-        console.log(appointments);
-
-        const result = {
+        return {
             success: true,
             message: "Appointments fetched successfully.",
             appointments,
@@ -307,32 +309,26 @@ export const getAppointments = async (userId, userType, appointment = {}) => {
                 hasPrev: page > 1
             }
         };
-
-        if (appointment.include_total === 'true' || userType === 'admin') {
-            result.total = total;
-        }
-
-        return result;
     } catch (error) {
         console.error('Database error:', error);
         return {
-            success: false, 
+            success: false,
             message: "Internal server Error"
         }
     }
 };
+
 export const getConsultantAvailability = async (consultantId, dateFrom, dateTo) => {
     try {
-        const query = `
-            SELECT appointment_datetime, status
-            FROM appointments 
-            WHERE consultant_id = ? 
-            AND appointment_datetime BETWEEN ? AND ?
+        const { rows: appointments } = await pool.query(
+            `SELECT appointment_datetime, status
+            FROM appointments
+            WHERE consultant_id = $1
+            AND appointment_datetime BETWEEN $2 AND $3
             AND status IN ('confirmed', 'pending', 'in_session')
-            ORDER BY appointment_datetime ASC
-        `;
-        
-        const [appointments] = await pool.query(query, [consultantId, dateFrom, dateTo]);
+            ORDER BY appointment_datetime ASC`,
+            [consultantId, dateFrom, dateTo]
+        );
 
         return {
             success: true,
@@ -347,7 +343,7 @@ export const getConsultantAvailability = async (consultantId, dateFrom, dateTo) 
 
 export const updateStatus = async(userId, userType, appointmentId, statusUpdate) => {
     try {
-        const [appointments] = await pool.query('SELECT * FROM appointments WHERE id = ?', [appointmentId]);
+        const { rows: appointments } = await pool.query('SELECT * FROM appointments WHERE id = $1', [appointmentId]);
         if (appointments.length === 0) {
             return {success: false, message: "Appointment not found"};
         }
@@ -357,24 +353,22 @@ export const updateStatus = async(userId, userType, appointmentId, statusUpdate)
         if (userType === 'consultant' && appointment.consultant_id !== userId) {
             return {success: false, message: "Not authorized to update this appointment"};
         }
-        
+
         if (userType === 'user' && appointment.user_id !== userId) {
             return {success: false, message: "Not authorized to update this appointment"};
         }
 
-        // Allow users to set status to 'cancelled' or 'in_session'
         if (userType === 'user' && !['cancelled', 'in_session'].includes(statusUpdate.status)) {
             return {success: false, message: "Users can only cancel appointments or start sessions"};
         }
 
-        // Validate status
         const validStatuses = ['pending', 'confirmed', 'in_session', 'cancelled', 'completed', 'rejected'];
         if (!validStatuses.includes(statusUpdate.status)) {
             return {success: false, message: "Invalid status"};
         }
 
         await pool.query(
-            'UPDATE appointments SET status = ?, cancellation_reason = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+            'UPDATE appointments SET status = $1, cancellation_reason = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
             [statusUpdate.status, statusUpdate.cancellation_reason || null, appointmentId]
         );
 
@@ -390,8 +384,11 @@ export const updateStatus = async(userId, userType, appointmentId, statusUpdate)
 
 export const consultantReview = async(userId, consultantId, review) => {
     try {
-        const [consultants] = await pool.query(
-            'SELECT * FROM consultants WHERE id = ?',
+        // Verify consultant exists
+        const { rows: consultants } = await pool.query(
+            `SELECT u.id FROM users u
+             INNER JOIN consultant_details cd ON cd.user_id = u.id
+             WHERE u.id = $1 AND u.role = 'consultant'`,
             [consultantId]
         );
 
@@ -399,8 +396,8 @@ export const consultantReview = async(userId, consultantId, review) => {
             return {success: false, message: "Consultant not found"};
         }
 
-        const [existingReviews] = await pool.query(
-            'SELECT id FROM reviews WHERE consultant_id = ? AND user_id = ?',
+        const { rows: existingReviews } = await pool.query(
+            'SELECT id FROM reviews WHERE consultant_id = $1 AND user_id = $2',
             [consultantId, userId]
         );
 
@@ -408,8 +405,8 @@ export const consultantReview = async(userId, consultantId, review) => {
             return {success: false, message: "Review already exists for this consultant"};
         }
 
-        const [completedAppointments] = await pool.query(
-            'SELECT id FROM appointments WHERE user_id = ? AND consultant_id = ? AND status = "completed"',
+        const { rows: completedAppointments } = await pool.query(
+            `SELECT id FROM appointments WHERE user_id = $1 AND consultant_id = $2 AND status = 'completed'`,
             [userId, consultantId]
         );
 
@@ -418,17 +415,18 @@ export const consultantReview = async(userId, consultantId, review) => {
         }
 
         await pool.query(
-            'INSERT INTO reviews (appointment_id, consultant_id, user_id, rating, review_text) VALUES (?, ?, ?, ?, ?)',
+            'INSERT INTO reviews (appointment_id, consultant_id, user_id, rating, review_text) VALUES ($1, $2, $3, $4, $5)',
             [completedAppointments[0].id, consultantId, userId, review.rating, review.review_text || null]
         );
 
-        const [ratingData] = await pool.query(
-            'SELECT AVG(rating) as avg_rating FROM reviews WHERE consultant_id = ?',
+        // Update consultant's average rating in consultant_details
+        const { rows: ratingData } = await pool.query(
+            'SELECT AVG(rating) as avg_rating FROM reviews WHERE consultant_id = $1',
             [consultantId]
         );
 
         await pool.query(
-            'UPDATE consultants SET rating = ? WHERE id = ?',
+            'UPDATE consultant_details SET rating = $1 WHERE user_id = $2',
             [parseFloat(ratingData[0].avg_rating).toFixed(2), consultantId]
         );
 
@@ -437,6 +435,7 @@ export const consultantReview = async(userId, consultantId, review) => {
             message: "Review added successfully"
         }
     } catch (error) {
+        console.error('Error in consultantReview:', error);
         return {
             success: false,
             message: "Internal server error"
@@ -451,8 +450,11 @@ export const fetchConsultantReviewsPaginated = async (consultantId, page, limit,
     const safeSortOrder = ALLOWED_SORT_ORDERS.includes((sortOrder || '').toUpperCase()) ? sortOrder.toUpperCase() : 'DESC';
 
     try {
-        const [consultantCheck] = await pool.query(
-            'SELECT id, first_name, last_name FROM consultants WHERE id = ?',
+        // Verify consultant exists
+        const { rows: consultantCheck } = await pool.query(
+            `SELECT u.id, p.first_name, p.last_name FROM users u
+             LEFT JOIN profiles p ON p.user_id = u.id
+             WHERE u.id = $1 AND u.role = 'consultant'`,
             [consultantId]
         );
 
@@ -465,33 +467,33 @@ export const fetchConsultantReviewsPaginated = async (consultantId, page, limit,
 
         const offset = (page - 1) * limit;
 
-        const [totalCount] = await pool.query(
-            'SELECT COUNT(*) as total FROM reviews WHERE consultant_id = ?',
+        const { rows: totalCount } = await pool.query(
+            'SELECT COUNT(*) as total FROM reviews WHERE consultant_id = $1',
             [consultantId]
         );
 
-        const total = totalCount[0].total;
+        const total = parseInt(totalCount[0].total);
         const totalPages = Math.ceil(total / limit);
 
-        const [reviews] = await pool.query(`
-            SELECT 
+        const { rows: reviews } = await pool.query(`
+            SELECT
                 r.id,
                 r.rating,
                 r.review_text,
                 r.created_at,
-                u.first_name as user_first_name,
-                u.last_name as user_last_name,
-                CONCAT(u.first_name, ' ', u.last_name) as user_name,
-                u.profile_image as user_profile_image
+                p.first_name as user_first_name,
+                p.last_name as user_last_name,
+                CONCAT(p.first_name, ' ', p.last_name) as user_name,
+                p.profile_image as user_profile_image
             FROM reviews r
-            JOIN users u ON r.user_id = u.id
-            WHERE r.consultant_id = ?
+            JOIN profiles p ON r.user_id = p.user_id
+            WHERE r.consultant_id = $1
             ORDER BY r.${safeSortBy} ${safeSortOrder}
-            LIMIT ? OFFSET ?
+            LIMIT $2 OFFSET $3
         `, [consultantId, limit, offset]);
 
-        const [avgRating] = await pool.query(
-            'SELECT AVG(rating) as avg_rating FROM reviews WHERE consultant_id = ?',
+        const { rows: avgRating } = await pool.query(
+            'SELECT AVG(rating) as avg_rating FROM reviews WHERE consultant_id = $1',
             [consultantId]
         );
 
@@ -528,15 +530,15 @@ export const fetchConsultantReviewsPaginated = async (consultantId, page, limit,
 
 export const blockAppointmentSlot = async ({ consultant_id, appointment_datetime, duration_minutes = 90 }) => {
     try {
-        const [conflicts] = await pool.query(
-            `SELECT id FROM appointments WHERE consultant_id = ? AND appointment_datetime = ? AND status = 'blocked'`,
+        const { rows: conflicts } = await pool.query(
+            `SELECT id FROM appointments WHERE consultant_id = $1 AND appointment_datetime = $2 AND status = 'blocked'`,
             [consultant_id, appointment_datetime]
         );
         if (conflicts.length > 0) {
             return { success: false, message: 'Slot already blocked' };
         }
         await pool.query(
-            `INSERT INTO appointments (consultant_id, appointment_datetime, duration_minutes, status, user_id, created_at, updated_at) VALUES (?, ?, ?, 'blocked', NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+            `INSERT INTO appointments (consultant_id, appointment_datetime, duration_minutes, status) VALUES ($1, $2, $3, 'blocked')`,
             [consultant_id, appointment_datetime, duration_minutes]
         );
         return { success: true };
@@ -548,7 +550,7 @@ export const blockAppointmentSlot = async ({ consultant_id, appointment_datetime
 
 export const confirmAppointment = async (consultantId, appointmentId) => {
     try {
-        const [appointments] = await pool.query('SELECT * FROM appointments WHERE id = ?', [appointmentId]);
+        const { rows: appointments } = await pool.query('SELECT * FROM appointments WHERE id = $1', [appointmentId]);
         if (appointments.length === 0) {
             return { success: false, message: 'Appointment not found' };
         }
@@ -560,7 +562,7 @@ export const confirmAppointment = async (consultantId, appointmentId) => {
             return { success: false, message: 'Only pending appointments can be confirmed' };
         }
         await pool.query(
-            'UPDATE appointments SET status = \'confirmed\', updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+            `UPDATE appointments SET status = 'confirmed', updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
             [appointmentId]
         );
         return { success: true, message: 'Appointment confirmed' };
@@ -572,7 +574,7 @@ export const confirmAppointment = async (consultantId, appointmentId) => {
 
 export const rejectAppointment = async (consultantId, appointmentId) => {
     try {
-        const [appointments] = await pool.query('SELECT * FROM appointments WHERE id = ?', [appointmentId]);
+        const { rows: appointments } = await pool.query('SELECT * FROM appointments WHERE id = $1', [appointmentId]);
         if (appointments.length === 0) {
             return { success: false, message: 'Appointment not found' };
         }
@@ -584,7 +586,7 @@ export const rejectAppointment = async (consultantId, appointmentId) => {
             return { success: false, message: 'Only pending appointments can be rejected' };
         }
         await pool.query(
-            'UPDATE appointments SET status = \'rejected\', updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+            `UPDATE appointments SET status = 'rejected', updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
             [appointmentId]
         );
         return { success: true, message: 'Appointment rejected' };
@@ -596,7 +598,7 @@ export const rejectAppointment = async (consultantId, appointmentId) => {
 
 export const rescheduleAppointment = async (userId, userType, appointmentId, newDateTime) => {
     try {
-        const [appointments] = await pool.query('SELECT * FROM appointments WHERE id = ?', [appointmentId]);
+        const { rows: appointments } = await pool.query('SELECT * FROM appointments WHERE id = $1', [appointmentId]);
         if (appointments.length === 0) {
             return { success: false, message: "Appointment not found" };
         }
@@ -607,15 +609,15 @@ export const rescheduleAppointment = async (userId, userType, appointmentId, new
         ) {
             return { success: false, message: "Not authorized to reschedule this appointment" };
         }
-        const [conflicts] = await pool.query(
-            `SELECT id FROM appointments 
-             WHERE consultant_id = ? 
-             AND id != ? 
-             AND status IN ('pending', 'confirmed', 'in_session') 
+        const { rows: conflicts } = await pool.query(
+            `SELECT id FROM appointments
+             WHERE consultant_id = $1
+             AND id != $2
+             AND status IN ('pending', 'confirmed', 'in_session')
              AND (
-                (appointment_datetime <= ? AND DATE_ADD(appointment_datetime, INTERVAL duration_minutes MINUTE) > ?)
+                (appointment_datetime <= $3 AND appointment_datetime + (duration_minutes || ' minutes')::interval > $4)
                 OR
-                (appointment_datetime < ? AND DATE_ADD(appointment_datetime, INTERVAL duration_minutes MINUTE) >= ?)
+                (appointment_datetime < $5 AND appointment_datetime + (duration_minutes || ' minutes')::interval >= $6)
              )`,
             [
                 appointment.consultant_id,
@@ -628,7 +630,7 @@ export const rescheduleAppointment = async (userId, userType, appointmentId, new
             return { success: false, message: "Time slot is already booked" };
         }
         await pool.query(
-            'UPDATE appointments SET appointment_datetime = ?, status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+            'UPDATE appointments SET appointment_datetime = $1, status = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
             [newDateTime, 'pending', appointmentId]
         );
         return { success: true, message: "Appointment rescheduled successfully" };
@@ -642,14 +644,16 @@ export const getUpcomingAppointments = async (minutesAhead = 15) => {
     try {
         const now = new Date();
         const future = new Date(now.getTime() + minutesAhead * 60000);
-        const [appointments] = await pool.query(
-            `SELECT a.id, a.user_id, a.consultant_id, a.appointment_datetime, CONCAT(u.first_name, ' ', u.last_name) as user_name, CONCAT(c.first_name, ' ', c.last_name) as consultant_name
+        const { rows: appointments } = await pool.query(
+            `SELECT a.id, a.user_id, a.consultant_id, a.appointment_datetime,
+                    CONCAT(pu.first_name, ' ', pu.last_name) as user_name,
+                    CONCAT(pc.first_name, ' ', pc.last_name) as consultant_name
                 FROM appointments a
-                JOIN users u ON a.user_id = u.id
-                JOIN consultants c ON a.consultant_id = c.id
+                JOIN profiles pu ON a.user_id = pu.user_id
+                JOIN profiles pc ON a.consultant_id = pc.user_id
                 WHERE a.status IN ('pending', 'confirmed')
-                AND a.appointment_datetime > ? AND a.appointment_datetime <= ?`,
-            [now.toISOString().slice(0, 19).replace('T', ' '), future.toISOString().slice(0, 19).replace('T', ' ')]
+                AND a.appointment_datetime > $1 AND a.appointment_datetime <= $2`,
+            [now.toISOString(), future.toISOString()]
         );
         return appointments;
     } catch (error) {

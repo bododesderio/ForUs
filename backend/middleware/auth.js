@@ -38,8 +38,8 @@ export const refreshToken = async (req, res) => {
         const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
 
         // Validate token exists in DB and is not expired
-        const [rows] = await pool.query(
-            'SELECT id FROM refresh_tokens WHERE token = ? AND expires_at > NOW()',
+        const { rows } = await pool.query(
+            'SELECT id FROM refresh_tokens WHERE token = $1 AND expires_at > NOW()',
             [refreshToken]
         );
         if (!rows || rows.length === 0) {

@@ -4,100 +4,129 @@ import jwt from 'jsonwebtoken';
 import { sendPushNotificationAsync } from './NotificationService.js';
 
 export const registerUser = async(user) => {
+    const client = await pool.connect();
     try {
+        await client.query('BEGIN');
         const hashedPassword = await bcrypt.hash(user.password, 10);
 
-        const query = `INSERT INTO users (username, email, password, profile_image) VALUES (?,?,?,?)`;
-        const values = [user.username, user.email, hashedPassword, user.profile_image || null];
+        const { rows } = await client.query(
+            `INSERT INTO users (email, password_hash, role) VALUES ($1, $2, 'user') RETURNING id, email, role`,
+            [user.email, hashedPassword]
+        );
+        const newUser = rows[0];
 
-        const [result] = await pool.query(query, values);
-        const userId = result.insertId;
-        const role = 'user';
-        
-        const response = {
-            success: true, 
+        await client.query(
+            `INSERT INTO profiles (user_id, username, profile_image) VALUES ($1, $2, $3)`,
+            [newUser.id, user.username, user.profile_image || null]
+        );
+
+        await client.query('COMMIT');
+
+        return {
+            success: true,
             message: 'User Registered Successfully.',
             user: {
-                id: userId,
-                email: user.email,
+                id: newUser.id,
+                email: newUser.email,
                 username: user.username,
-                role,
+                role: newUser.role,
                 profile_image: user.profile_image
             }
         };
-        return response;
-        
     } catch (error) {
-        if (error.code === 'ER_DUP_ENTRY') {
+        await client.query('ROLLBACK');
+        if (error.code === '23505') {
             return { success: false, message: 'Email already exists' };
         }
-        
-        return { 
-            success: false, 
-            message: 'Registration failed: ' + error.message 
+        return {
+            success: false,
+            message: 'Registration failed: ' + error.message
         };
+    } finally {
+        client.release();
     }
 };
 
 export const registerConsultant = async(user) => {
+    const client = await pool.connect();
     try {
-        const hashedPassword = await bcrypt.hash(user.password, 10)
-        const query = `INSERT INTO consultants (username, first_name, last_name, email, password) VALUES (?,?,?,?,?)`
-        const values = [user.username, user.first_name, user.last_name, user.email, hashedPassword];
+        await client.query('BEGIN');
+        const hashedPassword = await bcrypt.hash(user.password, 10);
 
-        await pool.query(query, values);
-        return {success: true, message: 'Consultant Registered Successfully.'}
+        const { rows } = await client.query(
+            `INSERT INTO users (email, password_hash, role) VALUES ($1, $2, 'consultant') RETURNING id, email, role`,
+            [user.email, hashedPassword]
+        );
+        const newUser = rows[0];
+
+        await client.query(
+            `INSERT INTO profiles (user_id, username, first_name, last_name) VALUES ($1, $2, $3, $4)`,
+            [newUser.id, user.username, user.first_name, user.last_name]
+        );
+
+        await client.query(
+            `INSERT INTO consultant_details (user_id) VALUES ($1)`,
+            [newUser.id]
+        );
+
+        await client.query('COMMIT');
+        return { success: true, message: 'Consultant Registered Successfully.', user: { id: newUser.id, email: newUser.email, role: newUser.role } };
     } catch (error) {
-        return {success: false, message: 'Registration failed.'}
+        await client.query('ROLLBACK');
+        if (error.code === '23505') {
+            return { success: false, message: 'Email already exists' };
+        }
+        return { success: false, message: 'Registration failed.' };
+    } finally {
+        client.release();
     }
-}
+};
 
-export const loginUser = async(email, password) => { 
+export const loginUser = async(email, password) => {
     try {
-        const [users] = await pool.query('SELECT * FROM users WHERE email = ?', [email]);
-        let user = null;
-        let role = null;
+        const { rows } = await pool.query(
+            `SELECT u.id, u.email, u.password_hash, u.role, u.is_active,
+                    p.username, p.first_name, p.last_name, p.profile_image, p.push_token
+             FROM users u
+             LEFT JOIN profiles p ON p.user_id = u.id
+             WHERE u.email = $1 AND u.deleted_at IS NULL`,
+            [email]
+        );
 
-        if(users && users.length > 0) {
-            user = users[0];
-            role = user.role;
-        }else {
-            const [admins] = await pool.query('SELECT * FROM admin WHERE email = ?', [email]);
+        if (!rows || rows.length === 0) {
+            return { success: false, message: "User does not exist." };
+        }
 
-            if(admins && admins.length > 0) {
-                user = admins[0];
-                role = user.role;
-            } else{
-                const [consultants] = await pool.query(`
-                    SELECT 
-                        c.*,
-                        COUNT(r.id) as total_reviews,
-                        ROUND(AVG(r.rating), 2) as average_rating,
-                        MAX(r.created_at) as latest_review_date
-                    FROM consultants c
-                    LEFT JOIN reviews r ON c.id = r.consultant_id
-                    WHERE c.email = ?
-                    GROUP BY c.id
-                `, [email]);
-                
-                if(consultants && consultants.length > 0){
-                    user = consultants[0];
-                    role = user.role;
-                }
+        const user = rows[0];
+
+        if (!user.is_active) {
+            return { success: false, message: "Account is deactivated." };
+        }
+
+        const isMatch = await bcrypt.compare(password, user.password_hash);
+        if (!isMatch) {
+            return { success: false, message: "Invalid credentials." };
+        }
+
+        // If consultant, fetch extra details
+        if (user.role === 'consultant') {
+            const { rows: detailRows } = await pool.query(
+                `SELECT cd.*,
+                        COALESCE(COUNT(r.id), 0)::int as total_reviews,
+                        ROUND(COALESCE(AVG(r.rating), 0), 2)::float as average_rating
+                 FROM consultant_details cd
+                 LEFT JOIN reviews r ON r.consultant_id = cd.user_id
+                 WHERE cd.user_id = $1
+                 GROUP BY cd.id`,
+                [user.id]
+            );
+            if (detailRows.length > 0) {
+                Object.assign(user, detailRows[0]);
             }
         }
 
-        if (!user || user.length === 0) {
-            return {success: false, message: "User or admin does not exists."};
-        }
-
-        const isMatch = await bcrypt.compare(password, user.password);
-        if (!isMatch) {
-            return {success: false, message: "Invalid credentials."};
-        }
-
         // Never return password hash to client
-        delete user.password;
+        delete user.password_hash;
 
         return {
             success: true,
@@ -105,50 +134,43 @@ export const loginUser = async(email, password) => {
             user
         };
     } catch (error) {
-        return {success: false, message: "Login failed. Please try again later."};
+        return { success: false, message: "Login failed. Please try again later." };
     }
-}
+};
 
 // Store refresh token in DB
 export const storeRefreshToken = async (userId, refreshToken) => {
-    // Create table if not exists: CREATE TABLE refresh_tokens (id INT AUTO_INCREMENT PRIMARY KEY, user_id INT, token VARCHAR(512), created_at DATETIME DEFAULT CURRENT_TIMESTAMP)
-    await pool.query('INSERT INTO refresh_tokens (user_id, token) VALUES (?, ?)', [userId, refreshToken]);
+    await pool.query(
+        'INSERT INTO refresh_tokens (user_id, token, expires_at) VALUES ($1, $2, NOW() + INTERVAL \'7 days\')',
+        [userId, refreshToken]
+    );
 };
 
 // Remove refresh token from DB (logout/revoke)
 export const revokeRefreshToken = async (refreshToken) => {
-    await pool.query('DELETE FROM refresh_tokens WHERE token = ?', [refreshToken]);
+    await pool.query('DELETE FROM refresh_tokens WHERE token = $1', [refreshToken]);
 };
 
 // Find refresh token in DB
 export const findRefreshToken = async (refreshToken) => {
-    const [rows] = await pool.query('SELECT * FROM refresh_tokens WHERE token = ?', [refreshToken]);
+    const { rows } = await pool.query('SELECT * FROM refresh_tokens WHERE token = $1', [refreshToken]);
     return rows.length > 0;
 };
 
-// Change password for users, admins, and consultants
+// Change password for any role (all in users table)
 export const changePasswordForAnyRole = async (userId, role, currentPassword, newPassword) => {
-    let table = null;
-    if (role === 'user') table = 'users';
-    else if (role === 'admin') table = 'admin';
-    else if (role === 'consultant') table = 'consultants';
-    else return { success: false, message: 'Invalid role.' };
-
     try {
-        // Get user/admin/consultant by ID
-        const [rows] = await pool.query(`SELECT * FROM ${table} WHERE id = ?`, [userId]);
+        const { rows } = await pool.query('SELECT id, password_hash FROM users WHERE id = $1', [userId]);
         if (!rows || rows.length === 0) {
             return { success: false, message: 'Account not found.' };
         }
         const user = rows[0];
-        // Check current password
-        const isMatch = await bcrypt.compare(currentPassword, user.password);
+        const isMatch = await bcrypt.compare(currentPassword, user.password_hash);
         if (!isMatch) {
             return { success: false, message: 'Current password is incorrect.' };
         }
-        // Hash new password and update
         const hashedPassword = await bcrypt.hash(newPassword, 10);
-        await pool.query(`UPDATE ${table} SET password = ? WHERE id = ?`, [hashedPassword, userId]);
+        await pool.query('UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2', [hashedPassword, userId]);
         return { success: true, message: 'Password changed successfully.' };
     } catch (error) {
         return { success: false, message: 'Password change failed.' };
@@ -156,14 +178,13 @@ export const changePasswordForAnyRole = async (userId, role, currentPassword, ne
 };
 
 export const saveAuthPushToken = async (authId, pushToken) => {
-    const query = 'UPDATE admin SET push_token = ? WHERE id = ?';
-    await pool.query(query, [pushToken, authId]);
+    await pool.query('UPDATE profiles SET push_token = $1 WHERE user_id = $2', [pushToken, authId]);
 };
 
 export const sendPushNotificationToAuth = async (authId, title, body, data) => {
-    const [rows] = await pool.query('SELECT push_token FROM admin WHERE id = ?', [authId]);
+    const { rows } = await pool.query('SELECT push_token FROM profiles WHERE user_id = $1', [authId]);
     if (!rows.length || !rows[0].push_token) {
-        throw new Error('Admin push token not found');
+        throw new Error('Push token not found');
     }
     return await sendPushNotificationAsync(rows[0].push_token, title, body, data);
 };

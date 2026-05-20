@@ -1,4 +1,4 @@
-import { pgTable, serial, varchar, text, integer, boolean, timestamp, date, jsonb, pgEnum, unique, index, time } from 'drizzle-orm/pg-core';
+import { pgTable, serial, varchar, text, integer, boolean, timestamp, date, jsonb, pgEnum, unique, index, time, real } from 'drizzle-orm/pg-core';
 
 // ─── Enums ────────────────────────────────────────────────────────────────────
 export const roleEnum = pgEnum('role', ['user', 'consultant', 'admin', 'super_admin']);
@@ -37,7 +37,9 @@ export const profiles = pgTable('profiles', {
     profileImage: varchar('profile_image', { length: 500 }),
     pushToken: varchar('push_token', { length: 255 }),
     notificationsEnabled: boolean('notifications_enabled').default(true),
-});
+}, (t) => ({
+    userIdIdx: index('profiles_user_id_idx').on(t.userId),
+}));
 
 // ─── Consultant Details (only for consultant role) ────────────────────────────
 export const consultantDetails = pgTable('consultant_details', {
@@ -50,9 +52,11 @@ export const consultantDetails = pgTable('consultant_details', {
     availableFrom: time('available_from').default('09:00:00'),
     availableTo: time('available_to').default('17:00:00'),
     availableDays: jsonb('available_days').default(['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']),
-    rating: varchar('rating', { length: 5 }).default('0.00'),
+    rating: real('rating').default(0),
     isApproved: boolean('is_approved').default(false).notNull(),
-});
+}, (t) => ({
+    userIdIdx: index('consultant_details_user_id_idx').on(t.userId),
+}));
 
 // ─── Admin Details (only for admin role) ─────────────────────────────────────
 export const adminDetails = pgTable('admin_details', {
@@ -78,7 +82,12 @@ export const appointments = pgTable('appointments', {
     mood: integer('mood'),
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
-});
+}, (t) => ({
+    userIdIdx: index('appointments_user_id_idx').on(t.userId),
+    consultantIdIdx: index('appointments_consultant_id_idx').on(t.consultantId),
+    datetimeIdx: index('appointments_datetime_idx').on(t.appointmentDatetime),
+    statusIdx: index('appointments_status_idx').on(t.status),
+}));
 
 // ─── Reviews ──────────────────────────────────────────────────────────────────
 export const reviews = pgTable('reviews', {
@@ -118,7 +127,7 @@ export const resources = pgTable('resources', {
     author: varchar('author', { length: 255 }),
     duration: varchar('duration', { length: 50 }),
     downloads: integer('downloads').default(0),
-    rating: varchar('rating', { length: 5 }).default('0'),
+    rating: real('rating').default(0),
     createdAt: timestamp('created_at').defaultNow().notNull(),
     deletedAt: timestamp('deleted_at'),
 });
@@ -145,7 +154,9 @@ export const notifications = pgTable('notifications', {
     data: jsonb('data'),
     isRead: boolean('is_read').default(false),
     createdAt: timestamp('created_at').defaultNow().notNull(),
-});
+}, (t) => ({
+    recipientIdIdx: index('notifications_recipient_id_idx').on(t.recipientId),
+}));
 
 // ─── Refresh Tokens ───────────────────────────────────────────────────────────
 export const refreshTokens = pgTable('refresh_tokens', {
@@ -154,7 +165,10 @@ export const refreshTokens = pgTable('refresh_tokens', {
     token: varchar('token', { length: 512 }).notNull(),
     expiresAt: timestamp('expires_at').notNull(),
     createdAt: timestamp('created_at').defaultNow().notNull(),
-});
+}, (t) => ({
+    tokenIdx: index('refresh_tokens_token_idx').on(t.token),
+    userIdIdx: index('refresh_tokens_user_id_idx').on(t.userId),
+}));
 
 // ─── Activities ───────────────────────────────────────────────────────────────
 export const activities = pgTable('activities', {
@@ -200,7 +214,10 @@ export const chatMessages = pgTable('chat_messages', {
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
     deletedAt: timestamp('deleted_at'),
-});
+}, (t) => ({
+    roomCreatedIdx: index('chat_messages_room_created_idx').on(t.roomId, t.createdAt),
+    userCreatedIdx: index('chat_messages_user_created_idx').on(t.userId, t.createdAt),
+}));
 
 // ─── Message Reactions ────────────────────────────────────────────────────────
 export const messageReactions = pgTable('message_reactions', {

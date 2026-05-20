@@ -169,7 +169,7 @@ export const update = async(req, res) => {
         const response = await updateStatus(userId, userType, appointmentId, statusUpdate);
         if(response.success){
             if (status === 'cancelled' || status === 'in_session') {
-                const [rows] = await pool.query('SELECT * FROM appointments WHERE id = ?', [appointmentId]);
+                const { rows } = await pool.query('SELECT * FROM appointments WHERE id = $1', [appointmentId]);
                 if (rows.length) {
                     const appt = rows[0];
                     try {
@@ -312,7 +312,7 @@ export const confirm = async (req, res) => {
     try {
         const result = await confirmAppointment(consultantId, appointmentId);
         if (result.success) {
-            const [rows] = await pool.query('SELECT * FROM appointments WHERE id = ?', [appointmentId]);
+            const { rows } = await pool.query('SELECT * FROM appointments WHERE id = $1', [appointmentId]);
             if (rows.length) {
                 const appt = rows[0];
                 try {
@@ -403,7 +403,7 @@ export const startSession = async (req, res) => {
         const statusUpdate = { status: 'in_session' };
         const response = await updateStatus(userId, userType, appointmentId, statusUpdate);
         if (response.success) {
-            const [rows] = await pool.query('SELECT * FROM appointments WHERE id = ?', [appointmentId]);
+            const { rows } = await pool.query('SELECT * FROM appointments WHERE id = $1', [appointmentId]);
             if (rows.length) {
                 const appt = rows[0];
                 try {

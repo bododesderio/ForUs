@@ -14,7 +14,7 @@ export const register = async(req, res) => {
             });
         }
 
-    const [existingUsers] = await pool.query('SELECT * FROM users WHERE email = ?', [email]);
+    const { rows: existingUsers } = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
         if (existingUsers.length > 0) {
             return res.status(400).json({ error: 'Email already exists' });
         }
@@ -42,7 +42,7 @@ export const consultant = async(req, res) => {
         return res.status(400).json({ errors: errors.array() });
     }
 
-    const [existingUsers] = await pool.query('SELECT * FROM consultants WHERE email = ?', [email]);
+    const { rows: existingUsers } = await pool.query('SELECT * FROM users WHERE email = $1 AND role = \'consultant\'', [email]);
         if (existingUsers.length > 0) {
             return res.status(400).json({ error: 'Email already exists' });
         }

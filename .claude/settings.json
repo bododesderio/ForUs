@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep -r \"console\\\\\\\\.log\\\\|console\\\\\\\\.error\\\\|console\\\\\\\\.warn\\\\|console\\\\\\\\.debug\" /e/Projects/ForUs1/backend --include=\"*.js\")",
+      "Bash(xargs ls *)"
+    ]
+  }
+}
