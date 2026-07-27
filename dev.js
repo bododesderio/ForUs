@@ -65,7 +65,7 @@ const openInNewTab = (command, title, workingDir = __dirname) => {
 
   createLockFile();
 
-  const backendPort = process.env.PORT || 3000;
+  const backendPort = process.env.PORT || 10005;
   const localIP = getLocalIP();
   const apiUrl = `http://${localIP}:${backendPort}/api`;
   const envPath = path.join(__dirname, 'frontend', '.env');
@@ -95,7 +95,7 @@ const openInNewTab = (command, title, workingDir = __dirname) => {
   console.log(`\n\u2705 Dev environment ready!`);
   console.log(`\u{1F310} Backend: http://localhost:${backendPort}`);
   console.log(`\u{1F4F1} API URL for device: ${apiUrl}`);
-  console.log(`\u{1F4A1} Tip: Docker services (postgres, redis, minio) must be running: docker compose up -d`);
+  console.log(`\u{1F4A1} Tip: Docker services (postgres, redis) must be running: docker compose up -d`);
 
   const cleanup = () => {
     if (fs.existsSync(lockFile)) fs.unlinkSync(lockFile);

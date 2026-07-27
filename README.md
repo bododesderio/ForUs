@@ -19,7 +19,7 @@ Active development. The app is mid-migration to a new design system and feature 
 **Mobile** — Expo 53 · React Native 0.79 · Expo Router · Tamagui · Stream Chat · Agora RTC (video, post Phase 6)
 **Desktop admin** (post Phase 9) — Next.js 14 · TypeScript · Tailwind, sharing tokens with mobile via `packages/tokens/`
 **Backend** — Express 5 · Drizzle ORM · PostgreSQL · Stream Chat · node-cron · Pesapal API v3 (post Phase 5) · Resend (post Phase 1)
-**Infra** — Docker Compose (PostgreSQL + Redis + MinIO), Cloudinary for media, Expo push for notifications
+**Infra** — Docker Compose (PostgreSQL + Redis), Cloudflare R2 for media, Expo push for notifications
 **CI** — GitHub Actions (backend Docker build + frontend tsc), Trunk.io linting
 
 ## Quick start
@@ -42,7 +42,7 @@ cd backend && npm run migrate && cd ..
 node dev.js
 ```
 
-`dev.js` boots the backend on `:4000` and the Expo dev server, watching both. Press `i` / `a` in the Expo CLI to launch a simulator.
+`dev.js` boots the backend on `:10005` (ForUs owns port lane 10000) and the Expo dev server, watching both. Press `i` / `a` in the Expo CLI to launch a simulator.
 
 ## Project layout
 
