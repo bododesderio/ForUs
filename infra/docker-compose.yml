@@ -1,0 +1,92 @@
+# @author Bodo Desderio <rooiboktechltd@gmail.com>
+# @copyright 2026 Rooibok Technologies. All rights reserved.
+# ForUs — Phase R backend (Django + FastAPI). Ports use the ForUs lane 10000.
+# The Node backend keeps its own root-level docker-compose.yml until R7 cutover.
+# Rollback for R0: `rm -rf services/ libs/ infra/` — the Node stack is untouched.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: always
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "10010:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    restart: always
+    ports:
+      - "10011:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  django:
+    build:
+      context: ../services/django-api
+    image: forus/django-api:dev
+    restart: always
+    command: sh -c "python manage.py migrate --noinput && gunicorn forus.wsgi:application --bind 0.0.0.0:8000 --workers 3 --access-logfile -"
+    env_file: [.env]
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    ports:
+      - "10001:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  fastapi:
+    build:
+      context: ../services/fastapi-rt
+    image: forus/fastapi-rt:dev
+    restart: always
+    env_file: [.env]
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    ports:
+      - "10002:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/rt/health')"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  celery:
+    image: forus/django-api:dev
+    restart: always
+    command: celery -A forus worker -l info
+    env_file: [.env]
+    depends_on:
+      django: { condition: service_started }
+      redis: { condition: service_healthy }
+
+  gateway:
+    image: nginx:1.27-alpine
+    restart: always
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      django: { condition: service_started }
+      fastapi: { condition: service_started }
+    ports:
+      - "10000:80"
+
+volumes:
+  pgdata:

@@ -1,13 +1,15 @@
 # Project Context
-Last updated: 2026-07-27
+Last updated: 2026-07-31
 
 ## Current task
-**Backend re-platform planned (Phase R) — awaiting approval.** Express/Node →
+**Phase R0 COMPLETE & verified — next up R1 (schema → Django models).** Express/Node →
 Django (DRF, core/CRUD/admin/payments) + FastAPI (realtime chat, video tokens,
 webhooks, AI/moderation), Postgres kept, big-bang pre-launch rewrite. Runs
 **before** the Stillwater feature migration. See `.claude/adrs/ADR-001-backend-replatform.md`
-+ `docs/plans/backend-replatform-plan.md`. Then Stillwater 0–10 (design built
-from doc spec + existing palette). Plans: `docs/plans/`. No code yet.
++ `docs/plans/backend-replatform-plan.md`.
+R0 scaffold (`services/django-api`, `services/fastapi-rt`, `libs/db`, `infra/`, CI) boots
+healthy behind the nginx gateway on lane 10000; audit captured in
+`docs/phase-R-hardening-requirements.md`. Node backend untouched. **Resume at R1 tomorrow.**
 
 ## What it is
 **ForUs** — a mobile-first mental wellness platform: therapist consultations,
@@ -51,6 +53,13 @@ Celery 10003, admin-web 10004, Node(transitional) 10005, Postgres 10010, Redis 1
 - Goals, streaks, voice journal, session notes, earnings, audit log, billing
   dashboard, cohort analytics — none (Phases 3, 8, 9, 10)
 
+## Recent decisions (2026-07-31)
+- **Phase R0 executed & verified** (see below). Direction chosen: capture audit as Phase-R
+  hardening requirements + scaffold R0; do **not** refactor the throwaway Node backend.
+- **Django admin relocated to `/api/admin/`** (traefik-routing convention) — old `/admin/` 404s.
+- **Audit** of as-built Node+Expo done: 25 findings (2 Critical IDOR, a boot-crash, perf/arch debt)
+  → `docs/phase-R-hardening-requirements.md`, each mapped to an R-phase + verification test.
+
 ## Recent decisions (2026-07-27)
 - **Backend re-platform** approved in principle: Express/Node → Django+FastAPI,
   big-bang pre-launch rewrite, runs BEFORE Stillwater (ADR-001). *Awaiting go for execution.*
@@ -66,20 +75,23 @@ Celery 10003, admin-web 10004, Node(transitional) 10005, Postgres 10010, Redis 1
 - **Current (Node, transitional):** raw SQL `$1,$2`; services throw, controllers catch.
 - Ports: never hardcode — derive from lane 10000 (`ports` skill + `~/.claude/PORTS.md`).
 
-## Next steps (resume here tomorrow)
-1. **Approve/kick off Phase R** — start at **R0** (scaffold `services/django-api/` +
-   `services/fastapi-rt/` + nginx gateway + compose + CI pytest/ruff). See
-   `docs/plans/backend-replatform-plan.md`.
-2. Start **Pesapal merchant onboarding** application (long pole, ~1–2 wk approval).
+## Next steps (resume here tomorrow — START R1)
+1. **R1 — schema → Django models + migrations.** Port the 18 tables (`backend/db/schema.js`)
+   to Django models with **UUID PKs**, FK cascades, soft-delete managers, enums → `TextChoices`.
+   Reversible initial migration (via `migrations` skill). Wire Django Admin for every model.
+   Reflect the same tables into SQLAlchemy Core in `libs/db/tables.py`. Resolves ARCH-1, ARCH-4, BUG-6.
+   Acceptance: `migrate` up+down on scratch DB; Admin lists all models; FastAPI reads a row via Core.
+2. Start **Pesapal merchant onboarding** (long pole, ~1–2 wk approval) — in parallel with R1.
 3. After Phase R lands → Stillwater 0–10 on the Python backend.
-- Open item (non-blocking): dockerized Node `backend` service still reads
-  `DATABASE_URL=localhost:...` — wrong inside container; irrelevant (deleted at R7).
 
-## Artifacts produced today
-- `.claude/adrs/ADR-001-backend-replatform.md`
-- `docs/plans/backend-replatform-plan.md` (Phase R, R0–R7)
-- `docs/plans/stillwater-implementation-plan.md` (0–10, re-sequenced after R)
-- Applied: Firebase+MinIO removed, StorageService→R2, ports→lane 10000. **Nothing committed.**
+## R0 done (2026-07-31) — scaffold verified booting healthy on lane 10000
+- `services/django-api/` (Django 5 + DRF, SimpleJWT rotation+blacklist, fail-fast env, structlog,
+  uniform exception handler, R2 storage cfg, Celery, `/api/health`, pytest+ruff)
+- `services/fastapi-rt/` (FastAPI, asyncpg + SA Core read-only, pydantic-settings, `/rt/health`, pytest+ruff)
+- `libs/db/` (reflection placeholder), `infra/` (compose pg16+redis7+django+fastapi+celery+nginx gateway, `.env.example`)
+- `.github/workflows/python-ci.yml` (ruff+pytest, pg+redis services)
+- `docs/phase-R-hardening-requirements.md` (25 findings → phase-mapped acceptance criteria)
+- **Verified:** `docker compose up` → both health endpoints 200 via gateway; 18 migrations apply; celery connects; admin at `/api/admin/`. Node backend untouched (rollback = `rm -rf services/ libs/ infra/`).
 
 ## Active branches
-- main: stable (all changes uncommitted in working tree)
+- `feat/backend-r0-scaffold`: Phase R0 (pushed; PR open). `main`: stable.
