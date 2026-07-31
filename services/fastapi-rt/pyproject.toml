@@ -1,5 +1,14 @@
 # @author Bodo Desderio <rooiboktechltd@gmail.com>
 # @copyright 2026 Rooibok Technologies. All rights reserved.
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+# Deps-only install: the service runs from its working dir (uvicorn app.main:app),
+# so no source packages are built — avoids setuptools flat-layout auto-discovery.
+[tool.setuptools]
+py-modules = []
+
 [project]
 name = "forus-fastapi-rt"
 version = "0.1.0"
