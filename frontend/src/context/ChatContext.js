@@ -190,6 +190,21 @@ export const ChatProvider = ({ children }) => {
         }
     }, []);
 
+    const createRoom = useCallback(async ({ name, type = 'messaging', members = [] } = {}) => {
+        try {
+            const res = await authFetch('/chat/rooms', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name, type, members }),
+            });
+            if (!res.ok) return null;
+            const data = await res.json();
+            return data.room_id || null;
+        } catch {
+            return null;
+        }
+    }, []);
+
     const loadHistory = useCallback(async (roomId, before = null) => {
         try {
             const q = before ? `?before=${encodeURIComponent(before)}` : '';
@@ -231,6 +246,7 @@ export const ChatProvider = ({ children }) => {
             sendReadReceipt,
             fetchRooms,
             loadHistory,
+            createRoom,
             connect,
             disconnect,
         }}>

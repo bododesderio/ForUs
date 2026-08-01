@@ -62,9 +62,6 @@
     "react-native-web": "^0.20.0",
     "react-native-webview": "13.13.5",
     "recharts": "^3.1.0",
-    "stream-chat-expo": "^8.1.0",
-    "stream-chat-react-native": "^8.0.0",
-    "stream-chat-react-native-core": "^8.0.0",
     "tamagui": "^1.129.4",
     "zod": "^3.25.67"
   },
