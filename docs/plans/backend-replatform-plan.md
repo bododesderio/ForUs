@@ -117,7 +117,10 @@ Admin/consultant route stubs stay stubs (Stillwater Phase 9 fills them).
 - **Accept:** reminder fires 15 min pre-appointment through Celery; auto-cancel matches Node timing.
   **Rollback:** re-enable node-cron; Celery tasks are additive.
 
-## R7 · Cutover & decommission Node  — Est 3–5 p-days · blocked-by: R2–R6
+## R7 · Cutover & decommission Node  — ✅ DONE 2026-08-01 · blocked-by: R2–R6
+> nginx gateway → Python only (fixed `/ws` exact-path routing). dev.js → Python stack on :10000.
+> Deleted `backend/` (Node, 48 files) + root `docker-compose.yml`. Stack verified healthy through the
+> gateway (api/rt/ws/admin + Celery beat). 90 tests. Remaining Phase-R item: R4c-2 chat UI screens (Expo).
 - Gateway routes **100%** of `/api` + `/ws` to Python. Run parity harness full-suite; soak 48h in staging.
 - Remove `backend/` (Node) and Stream Chat deps. (Firebase + MinIO already removed 2026-07-27;
   Cloudinary removed at R5.) Update README, CONTEXT,

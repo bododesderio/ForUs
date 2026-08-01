@@ -6,13 +6,12 @@
 Last updated: 2026-08-01
 
 ## Current task
-**Phase R6 (Celery jobs) done. Remaining in R: R4c-2 (chat UI, needs Expo) + R7 (cutover, delete Node).**
-R6: node-cron → Celery-beat. `appointments/tasks.py` — `send_appointment_reminders` (15-min-ahead)
-and `cancel_expired_appointments` (scheduled counterpart to on-read auto-cancel), both on a `*/5`
-crontab (`CELERY_BEAT_SCHEDULE`; compose celery now runs `worker -B`). `core/push.py`: `send_expo_push`
-(httpx→Expo) + `notify()` — the corrected notification helper (BUG-5: one row per recipient,
-non-null recipient_id, no double-save; Node crashed every run). 90 tests green (79 Django + 11 FastAPI).
-`notify()` is the shared push helper the R3c/R4 state-change points can adopt (deferred push delivery).
+**Phase R COMPLETE except R4c-2 (chat UI screens, needs Expo runtime). Node backend deleted (R7).**
+R7 cutover: nginx gateway routes `/api/**`→Django, `/rt/**`+`/ws`→FastAPI (fixed `/ws` exact-path
+routing); `dev.js` now boots the Python stack behind the gateway on `:10000`; **deleted `backend/`
+(Node, 48 files) + root `docker-compose.yml`**. Verified the full stack boots healthy through the
+gateway (`/api/health` 200, `/rt/health` 200, `/ws` upgrade→FastAPI 403-without-ticket, admin 200,
+Celery beat scheduling). 90 tests green. Only frontend chat-screen rewrite (R4c-2) remains in Phase R.
 R5: single Django upload path `POST /api/upload` → Cloudflare R2 via django-storages. **SEC-6**:
 oversize rejected before streaming (Django spools to temp, no 50 MB in-memory buffer), real
 content-type **sniffed from magic bytes** (client mimetype never trusted — a `.exe` renamed `.png`

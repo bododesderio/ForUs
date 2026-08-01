@@ -171,3 +171,12 @@ Created: 2026-07-27
 - **notify() is the shared push helper** the R3c/R4 state-change push points (deferred to R6) can now adopt — not yet retrofitted (scope). streak/payout tasks come with Stillwater P3/P5.
 - **Tests:** upcoming window, BUG-5 (2 rows/appt one per recipient), push gating (opted-in→pushed, disabled/tokenless→skip), cancel task, invalid-token ValueError. Push monkeypatched (no network). 90 total (79 django + 11 fastapi), ruff clean. Verified tasks register + beat loads via celery loader.
 - **Resume:** R7 cutover (route all →Python, parity harness, delete backend/) OR R4c-2 chat UI. Phase R nearly done: R0-R6 ✅ (minus R4c-2 UI).
+
+## [2026-08-01] — Phase R7: cutover + delete Node
+- **nginx gateway** (infra/nginx/nginx.conf): fixed `location /ws/` → `location /ws` (prefix) so the exact `/ws` path the client connects to routes to FastAPI (was a 404 gap). /api→django, /rt+/ws→fastapi, /api/admin→django. Already Python-only otherwise.
+- **dev.js**: repointed from Node backend (:10005, nodemon server.js) to the Python stack behind the gateway (:10000, `docker compose up` in infra/). Writes frontend .env API_BASE_URL=http://IP:10000/api. dotenv → infra/.env.
+- **Deleted:** backend/ (Node, 48 files) + root docker-compose.yml (Node stack). Remaining top-level: docs frontend infra libs services. getstream/cloudinary/express deps gone with backend/package.json (PERF-6).
+- **README** updated: stack (Django+FastAPI), quickstart (infra compose), project layout, conventions (DRF/SimpleJWT/structlog), chat (native WS).
+- **Verified cutover:** built + `docker compose up -d --build`; all healthy. Through gateway :10000 — /api/health 200, /rt/health 200, /api/admin/login 200, /ws WS-upgrade → FastAPI 403 (no ticket = correct SEC-4), celery beat scheduling send_appointment_reminders. compose config valid. 90 tests green (79 django + 11 fastapi), ruff clean both.
+- **Phase R = COMPLETE** except R4c-2 (frontend chat SCREENS still on Stream components — needs Expo runtime to rewrite+verify). Node is gone; the parity harness's Node reference no longer exists (tests are self-contained, don't import backend/).
+- **Resume:** R4c-2 chat UI (Expo) OR Stillwater 0-10 on the Python backend.

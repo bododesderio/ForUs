@@ -7,7 +7,7 @@ const path = require("path");
 const { spawn, exec } = require("child_process");
 const os = require("os");
 const net = require("net");
-require("dotenv").config({ path: path.join(__dirname, "backend", ".env") });
+require("dotenv").config({ path: path.join(__dirname, "infra", ".env") });
 
 const lockFile = path.join(__dirname, '.dev-servers.lock');
 
@@ -69,24 +69,26 @@ const openInNewTab = (command, title, workingDir = __dirname) => {
 
   createLockFile();
 
-  const backendPort = process.env.PORT || 10005;
+  // Post-R7: the Python stack (Django + FastAPI) sits behind the nginx gateway on
+  // the ForUs lane base port 10000. The Node backend is gone.
+  const gatewayPort = process.env.GATEWAY_PORT || 10000;
   const localIP = getLocalIP();
-  const apiUrl = `http://${localIP}:${backendPort}/api`;
+  const apiUrl = `http://${localIP}:${gatewayPort}/api`;
   const envPath = path.join(__dirname, 'frontend', '.env');
 
-  // Write local IP to frontend .env
+  // Write local IP to frontend .env (REST + WS both go through the gateway).
   fs.writeFileSync(envPath, `API_BASE_URL=${apiUrl}\n`);
   console.log(`\u2705 Frontend .env updated: API_BASE_URL=${apiUrl}`);
   console.log(`\u{1F4F1} Use this IP on your physical device (must be on same WiFi)`);
 
-  const backendRunning = await isPortInUse(backendPort);
+  const gatewayRunning = await isPortInUse(gatewayPort);
   const expoRunning = await isPortInUse(8081);
 
-  if (!backendRunning) {
-    console.log('\u{1F680} Starting backend...');
-    openInNewTab('npx nodemon server.js', 'Backend Server', path.join(__dirname, 'backend'));
+  if (!gatewayRunning) {
+    console.log('\u{1F680} Starting the Python stack (Django + FastAPI + Celery + gateway)...');
+    openInNewTab('docker compose up', 'ForUs backend (docker)', path.join(__dirname, 'infra'));
   } else {
-    console.log(`\u{1F680} Backend already running on port ${backendPort}`);
+    console.log(`\u{1F680} Gateway already running on port ${gatewayPort}`);
   }
 
   if (!expoRunning) {
@@ -97,9 +99,8 @@ const openInNewTab = (command, title, workingDir = __dirname) => {
   }
 
   console.log(`\n\u2705 Dev environment ready!`);
-  console.log(`\u{1F310} Backend: http://localhost:${backendPort}`);
+  console.log(`\u{1F310} Gateway (REST + WS): http://localhost:${gatewayPort}`);
   console.log(`\u{1F4F1} API URL for device: ${apiUrl}`);
-  console.log(`\u{1F4A1} Tip: Docker services (postgres, redis) must be running: docker compose up -d`);
 
   const cleanup = () => {
     if (fs.existsSync(lockFile)) fs.unlinkSync(lockFile);

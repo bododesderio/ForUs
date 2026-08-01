@@ -20,44 +20,39 @@ Active development. The app is mid-migration to a new design system and feature 
 
 ## Stack
 
-**Mobile** — Expo 53 · React Native 0.79 · Expo Router · Tamagui · Stream Chat · Agora RTC (video, post Phase 6)
+**Mobile** — Expo 53 · React Native 0.79 · Expo Router · Tamagui · native WebSocket chat · Agora RTC (video, post Phase 6)
 **Desktop admin** (post Phase 9) — Next.js 14 · TypeScript · Tailwind, sharing tokens with mobile via `packages/tokens/`
-**Backend** — Express 5 · Drizzle ORM · PostgreSQL · Stream Chat · node-cron · Pesapal API v3 (post Phase 5) · Resend (post Phase 1)
-**Infra** — Docker Compose (PostgreSQL + Redis), Cloudflare R2 for media, Expo push for notifications
-**CI** — GitHub Actions (backend Docker build + frontend tsc), Trunk.io linting
+**Backend** — Django 5 + DRF (data/auth/CRUD/admin/media) · FastAPI (realtime WS chat) · PostgreSQL · Redis · Celery · Pesapal API v3 (post Phase 5) · Resend (post Phase 1)
+**Infra** — Docker Compose (Postgres + Redis + Django + FastAPI + Celery + nginx gateway), Cloudflare R2 for media, Expo push for notifications
+**CI** — GitHub Actions (Python: ruff + pytest), Trunk.io linting
 
 ## Quick start
 
-Prereqs: Node 20+, Docker Desktop, an Expo account.
+Prereqs: Node 20+ (Expo), Docker Desktop, an Expo account.
 
 ```bash
-# Install
-npm install
-cd backend && npm install && cd ..
+# Install the app deps
 cd frontend && npm install && cd ..
 
-# Bring up Postgres + Redis + MinIO
-docker compose up -d
+# Bring up the whole Python stack (Django + FastAPI + Celery behind the nginx gateway)
+cd infra && cp .env.example .env   # fill in secrets, then:
+docker compose up -d --build       # migrations run automatically on the django service
 
-# Apply migrations
-cd backend && npm run migrate && cd ..
-
-# Run backend + Expo together
+# Run the backend stack + Expo together
 node dev.js
 ```
 
-`dev.js` boots the backend on `:10005` (ForUs owns port lane 10000) and the Expo dev server, watching both. Press `i` / `a` in the Expo CLI to launch a simulator.
+`dev.js` brings up the Python stack behind the nginx gateway on `:10000` (ForUs port lane 10000) and starts the Expo dev server, pointing the app's `API_BASE_URL` at the gateway. Press `i` / `a` in the Expo CLI to launch a simulator.
 
 ## Project layout
 
 ```text
-backend/
-  controllers/    Route handlers
-  services/       Business logic (PostgreSQL via Drizzle)
-  db/schema.js    16 tables across auth, profiles, appointments, chat, mood, resources, events, community
-  routes/         Express route registration
-  middleware/     auth (JWT), rate limiters
-  scripts/        Migration runner, seeds
+services/
+  django-api/     Django 5 + DRF — auth, users, appointments, mood, events, resources,
+                  chat REST, media upload; 6 domain apps, admin, Celery tasks
+  fastapi-rt/     FastAPI realtime tier — WebSocket chat (/ws), Redis pub/sub fan-out
+libs/db/          SQLAlchemy Core reflections of the Django-owned schema (shared)
+infra/            docker-compose (Postgres · Redis · Django · FastAPI · Celery · nginx gateway)
 
 frontend/
   app/            Expo Router file-based routes
@@ -77,7 +72,7 @@ docs/
 
 - **Auth** — register, login, JWT (15min) + refresh (7d) tokens, push token registration
 - **Appointments** — create, list, confirm/reject/cancel/reschedule, auto-cancel stale pending, post-appointment reviews, 5-min cron sends reminders 15min before start
-- **Chat** — Stream Chat 1:1 and group rooms with typing indicators
+- **Chat** — native WebSocket 1:1 and group rooms (FastAPI + Redis pub/sub) with typing indicators
 - **Mood** — daily entry (1–10 scale, one per day), simple history
 - **Resources** — 8 content types (book, article, music, audio, podcast, routine, video, image), browse + per-type screens
 - **Events** — community events with statuses
@@ -144,10 +139,10 @@ After each phase ships: update [`docs/STILLWATER_MIGRATION.md`](docs/STILLWATER_
 
 ## Conventions
 
-- **Database** — PostgreSQL via Drizzle. `$1, $2` placeholders only. No raw `?` placeholders (project was migrated off MySQL syntax in Apr 2026)
-- **Auth** — every protected route uses the `auth` middleware. Role checks happen in controllers, not routes
-- **Errors** — services throw, controllers catch and shape the response
-- **Logs** — backend logs to stdout; structured logging is a Stillwater Phase 9 task
+- **Database** — PostgreSQL; Django ORM + migrations are the single source of schema truth. FastAPI reads the same tables via SQLAlchemy Core reflection (never runs DDL). UUID PKs, soft deletes
+- **Auth** — DRF SimpleJWT (15m access / 7d refresh, rotation + blacklist). Role checks are declarative DRF permission classes
+- **Errors** — one envelope `{success, message, errors}` via the DRF exception handler; services raise, never return `{success:false}` sentinels
+- **Logs** — structured JSON via structlog to stdout
 
 ## License
 
