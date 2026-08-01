@@ -177,6 +177,7 @@ unaffected; `npm test` green. ⟨No design dependency.⟩
 ---
 
 # Phase 2 · Onboarding redesign (12 screens) + real email
+> **backend ✅ DONE 2026-08-01:** forgot-password (POST /api/auth/forgot-password + /reset-password on the R1 password_reset_tokens model, no account enumeration) + email verification (verify-email/request + /confirm via signed token, sets email_verified) + Resend email service (core/email.py, no-op without key). 7 tests.
 **Blocked-by:** Phases 0, 1. **Est: 7–9 person-days.**
 
 ### Screens (replace `frontend/src/app/(auth)/onBoarding.tsx` Lottie carousel) ⟨design unresolved — B‑1⟩

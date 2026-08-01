@@ -198,6 +198,11 @@ R2_PUBLIC_URL = env("R2_PUBLIC_URL", default="")
 # Hard cap enforced before an upload is streamed to storage (SEC-6).
 MAX_UPLOAD_BYTES = int(env("MAX_UPLOAD_BYTES", default=str(50 * 1024 * 1024)))
 
+# ─── Email (Resend) + password-reset / verification links (P2) ──────────────────
+RESEND_API_KEY = env("RESEND_API_KEY", default="")
+EMAIL_FROM = env("EMAIL_FROM", default="ForUs <no-reply@forus.app>")
+FRONTEND_URL = env("FRONTEND_URL", default="https://app.forus.app")
+
 # ─── i18n / static ──────────────────────────────────────────────────────────────
 LANGUAGE_CODE = "en-us"
 TIME_ZONE = "UTC"

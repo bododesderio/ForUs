@@ -5,12 +5,16 @@ from django.urls import path
 
 from .views import (
     ChangePasswordView,
+    ConfirmEmailVerificationView,
+    ForgotPasswordView,
     LoginView,
     LogoutView,
     PushTokenView,
     RefreshView,
     RegisterConsultantView,
     RegisterUserView,
+    RequestEmailVerificationView,
+    ResetPasswordView,
 )
 
 # `send-notification` is intentionally NOT exposed here — the Node route was unauthenticated
@@ -23,4 +27,8 @@ urlpatterns = [
     path("logout", LogoutView.as_view(), name="logout"),
     path("change-password", ChangePasswordView.as_view(), name="change-password"),
     path("push-token", PushTokenView.as_view(), name="push-token"),
+    path("forgot-password", ForgotPasswordView.as_view(), name="forgot-password"),
+    path("reset-password", ResetPasswordView.as_view(), name="reset-password"),
+    path("verify-email/request", RequestEmailVerificationView.as_view(), name="verify-email-request"),
+    path("verify-email/confirm", ConfirmEmailVerificationView.as_view(), name="verify-email-confirm"),
 ]

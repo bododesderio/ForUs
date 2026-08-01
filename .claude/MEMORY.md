@@ -197,3 +197,11 @@ Created: 2026-07-27
 - **Follow-ups (need schema/UI/runtime):** groups (GET /groups, join) + typed reactions (support|same|hugs) need new tables; feed UI (B-1 design blocker); @adjective_noun_NN handle generation on signup (accounts.register).
 - **Verified:** 8 community tests (create/feed/pseudonymity, like idempotency+unlike, liked flag per-caller, comments+counts, owner/admin delete, soft-delete→404, auth). Full: 98 tests (87 django + 11 fastapi), ruff clean.
 - **Next verifiable backend:** deferred push wiring (notify() into appointment/chat state changes); P2 forgot-password + email (Resend stub) + email_verified. External-dep phases (P5 payments/Pesapal, P6 video/Agora) gated on onboarding.
+
+## [2026-08-01] — Stillwater P2 backend: forgot-password + email verification
+- **Files:** core/email.py (Resend via httpx, no-op without RESEND_API_KEY → tests never hit network). accounts/views.py += ForgotPasswordView/ResetPasswordView/RequestEmailVerificationView/ConfirmEmailVerificationView. accounts/urls.py routes. settings RESEND_API_KEY/EMAIL_FROM/FRONTEND_URL. Tests: accounts/tests/test_password_email.py (7). Also wired notify() into appointment create/confirm/cancel/start-session/review (test_notifications_wiring.py, 4).
+- **Forgot-password:** POST /api/auth/forgot-password {email} → PasswordResetToken (R1 model, 1h expiry) + email link; ALWAYS 200 (no account enumeration). POST /api/auth/reset-password {token,newPassword} → validate (unused+unexpired), validate_password, set_password, mark used_at, record_activity. Reused/expired token → 400.
+- **Email verify:** DB-free signed token (django.core.signing.TimestampSigner salt='forus:email-verify', 24h). verify-email/request (auth) emails link; verify-email/confirm {token} → email_verified=True. Bad/expired → 400.
+- **Gotcha:** don't put a module-level constant (EMAIL_VERIFY_SALT) between import groups → E402 breaks subsequent imports. Put constants after ALL imports.
+- **Verified:** 109 tests (98 django + 11 fastapi), ruff clean.
+- **Next:** register could auto-send verification email + assign pseudonymous handle (P4). External: P5 payments (Pesapal), P6 video (Agora). SEC-9 secure-store (frontend, device).

@@ -10,6 +10,13 @@ Auth endpoints (DRF), ported from the Node `/api/auth/*` surface with response p
 """
 from __future__ import annotations
 
+import secrets
+from datetime import timedelta
+
+from django.conf import settings
+from django.contrib.auth import password_validation
+from django.core.signing import BadSignature, SignatureExpired, TimestampSigner
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.request import Request
@@ -18,7 +25,9 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from .models import Activity, Profile, User
+from core.email import send_email
+
+from .models import Activity, PasswordResetToken, Profile, User
 from .serializers import (
     ActivitySerializer,
     ChangePasswordSerializer,
@@ -32,6 +41,8 @@ from .serializers import (
 )
 from .services import record_activity, register_consultant, register_user
 from .tokens import tokens_for_user
+
+EMAIL_VERIFY_SALT = "forus:email-verify"
 
 
 class RegisterUserView(APIView):
@@ -192,3 +203,104 @@ class ActivityListView(APIView):
     def get(self, request: Request) -> Response:
         rows = Activity.objects.filter(user=request.user).order_by("-created_at")[:20]
         return Response(ActivitySerializer(rows, many=True).data, status=status.HTTP_200_OK)
+
+
+# ─── Forgot / reset password (P2) ────────────────────────────────────────────────
+class ForgotPasswordView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request: Request) -> Response:
+        email = (request.data.get("email") or "").strip()
+        user = User.objects.filter(email__iexact=email, deleted_at__isnull=True).first()
+        if user is not None:
+            token = secrets.token_urlsafe(32)
+            PasswordResetToken.objects.create(
+                user=user, token=token, expires_at=timezone.now() + timedelta(hours=1)
+            )
+            link = f"{settings.FRONTEND_URL}/reset-password?token={token}"
+            send_email(
+                user.email,
+                "Reset your ForUs password",
+                f'<p>Tap to reset your password:</p><p><a href="{link}">Reset password</a></p>'
+                f"<p>This link expires in 1 hour. If you didn't request it, ignore this email.</p>",
+            )
+        # Never reveal whether the email exists (no account enumeration).
+        return Response(
+            {"success": True, "message": "If that email exists, a reset link has been sent."},
+            status=status.HTTP_200_OK,
+        )
+
+
+class ResetPasswordView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request: Request) -> Response:
+        token = request.data.get("token")
+        new_password = request.data.get("newPassword")
+        if not token or not new_password:
+            return Response(
+                {"success": False, "message": "Token and newPassword are required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        prt = (
+            PasswordResetToken.objects.filter(
+                token=token, used_at__isnull=True, expires_at__gt=timezone.now()
+            )
+            .select_related("user")
+            .first()
+        )
+        if prt is None:
+            return Response(
+                {"success": False, "message": "Invalid or expired token."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        try:
+            password_validation.validate_password(new_password, prt.user)
+        except Exception as exc:
+            return Response(
+                {"success": False, "message": " ".join(getattr(exc, "messages", [str(exc)]))},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        prt.user.set_password(new_password)
+        prt.user.save(update_fields=["password", "updated_at"])
+        prt.used_at = timezone.now()
+        prt.save(update_fields=["used_at"])
+        record_activity(prt.user, "password_reset", "Password reset via email")
+        return Response(
+            {"success": True, "message": "Password reset successfully."}, status=status.HTTP_200_OK
+        )
+
+
+# ─── Email verification (P2, DB-free signed token) ──────────────────────────────
+class RequestEmailVerificationView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request: Request) -> Response:
+        token = TimestampSigner(salt=EMAIL_VERIFY_SALT).sign(str(request.user.id))
+        link = f"{settings.FRONTEND_URL}/verify-email?token={token}"
+        send_email(
+            request.user.email,
+            "Verify your ForUs email",
+            f'<p>Confirm your email:</p><p><a href="{link}">Verify email</a></p>',
+        )
+        return Response({"success": True, "message": "Verification email sent."}, status=status.HTTP_200_OK)
+
+
+class ConfirmEmailVerificationView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request: Request) -> Response:
+        token = request.data.get("token")
+        if not token:
+            return Response(
+                {"success": False, "message": "Token is required."}, status=status.HTTP_400_BAD_REQUEST
+            )
+        try:
+            user_id = TimestampSigner(salt=EMAIL_VERIFY_SALT).unsign(token, max_age=60 * 60 * 24)
+        except (BadSignature, SignatureExpired):
+            return Response(
+                {"success": False, "message": "Invalid or expired token."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        User.objects.filter(pk=user_id).update(email_verified=True)
+        return Response({"success": True, "message": "Email verified."}, status=status.HTTP_200_OK)
