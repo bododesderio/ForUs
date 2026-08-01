@@ -91,7 +91,7 @@ cutover gate) unless a change ships with a matching frontend edit.
 | **R1** ✅ | ARCH-1 (Django-owned reversible migrations; FastAPI reflects via Core), ARCH-4 (`community_*` + `password_reset_tokens` modeled, dormant), BUG-6 (`DEFAULT_DURATION_MINUTES=60`) — verified up+down on a scratch DB, Admin lists all 19 models, Core reads a row |
 | **R2** ✅ | SEC-1 (push-token auth-gated, owner=request.user; send-notification unexposed), SEC-3 (rotation+blacklist, reuse→403), SEC-7 (prod-safe messages), BUG-2 (every path responds), BUG-3 (missing fields→400), ARCH-2 (one `{success,message,errors}` envelope) — 14 auth tests green |
 | **R3** ✅ | BUG-4 ✅ (events non-admin→403, true PATCH) · BUG-6 ✅ (duration 60) · ARCH-2 ✅ (one error envelope) · ARCH-3 ✅ (role checks are declarative permission classes; no dead stubs) · PERF-1 (reads use R1 indexes). Extra: appointment IDOR closed, `/users` PII admin-gated, `send-notification` admin-only |
-| **R4** 🚧 | SEC-2 (REST history+join gated ✅; WS ops in R4b) · SEC-4, BUG-7, PERF-3..6, ARCH-5, SEC-8/9 pending R4b/R4c |
+| **R4** 🚧 | SEC-2 ✅ (REST + WS send/join_room membership) · SEC-4 ✅ (single-use WS ticket, no URL token) · BUG-7 ✅ (persist-then-broadcast) · PERF-3..6 ✅ (Redis pub/sub multi-worker fan-out) · ARCH-5 (chat unified on FastAPI) · SEC-9 pending R4c frontend · SEC-8 → R5 (Pesapal IPN) |
 | **R5** | SEC-6 |
 | **R6** | PERF-1 (job side), PERF-2, BUG-5 |
 | **R7** | PERF-6 (dep removal) |

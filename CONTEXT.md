@@ -6,13 +6,13 @@
 Last updated: 2026-08-01
 
 ## Current task
-**Phase R4 IN PROGRESS — R4a (Django chat REST) done; next R4b (FastAPI WS) + R4c (frontend).**
-R4a ported the chat REST surface to Django: `POST/GET /api/chat/rooms`, `GET /rooms/:id/messages`
-(membership-gated), `POST /rooms/:id/join` (**SEC-2 authorized**: already-member OR open room type
-OR appointment-linked). Stream `/token` + `/webhook` dropped. Message *sending* is realtime (R4b).
-65 django tests green. **R4b:** FastAPI WS at `/ws` — Redis pub/sub fan-out (multi-worker, PERF-3..6),
-persist-then-broadcast (BUG-7), WS ticket auth (SEC-4), membership checks on every op (SEC-2).
-**R4c:** repoint `ChatContext.js`, remove `stream-chat-*` deps.
+**Phase R4 IN PROGRESS — R4a+R4b done (backend chat); only R4c (frontend) left.**
+R4a: chat REST on Django (rooms/messages/join, SEC-2). R4b: **FastAPI WebSocket** at `/ws` —
+ticket auth (SEC-4, `GET /api/chat/token` issues a 30s single-use Redis ticket), persist-then-
+broadcast (BUG-7), **Redis pub/sub** fan-out across workers (PERF-3..6), membership checks on
+send + join_room history (SEC-2). Stream Chat fully dropped server-side. 78 tests green
+(67 Django + 11 FastAPI; realtime repo layer verified against the compose DB).
+**R4c:** repoint `ChatContext.js` WS URL + swap token→ticket flow; remove `stream-chat-*` deps.
 
 ## Superseded — Phase R3 COMPLETE (next up R4 realtime chat)
 Express/Node → Django (DRF, core/CRUD/admin/payments) + FastAPI (realtime chat,
@@ -156,15 +156,14 @@ Celery 10003, admin-web 10004, Node(transitional) 10005, Postgres 10010, Redis 1
 - **Current (Node, transitional):** raw SQL `$1,$2`; services throw, controllers catch.
 - Ports: never hardcode — derive from lane 10000 (`ports` skill + `~/.claude/PORTS.md`).
 
-## Next steps (finish R4)
-1. **R4b — FastAPI WS** at `/ws`. Events: send_message, typing, read_receipt, join_room.
-   **Persist-then-broadcast** (BUG-7 — Node broadcast before a fire-and-forget insert).
-   **Redis pub/sub** fan-out so messages reach connections on other workers (PERF-3..6; Node used an
-   in-process Map). **WS ticket auth** — REST issues a short-lived single-use ticket (Redis, ~30s TTL),
-   WS handshake exchanges it (SEC-4, no bearer token in the URL). Membership check on send + join_room
-   history (SEC-2). Add `GET /api/chat/token` (Django) → issues the WS ticket.
-2. **R4c — frontend.** Repoint `ChatContext.js` WS URL to the FastAPI gateway path; swap the token
-   call for the ticket flow; remove `stream-chat`/`stream-chat-expo`/`stream-chat-react-native*`.
+## Next steps (finish R4 → R5)
+1. **R4c — frontend.** Repoint `ChatContext.js`: connect `wss://gateway/ws?ticket=<t>` where the
+   ticket comes from `GET /api/chat/token`; drop the Stream client init; message send/typing/receipt
+   over the native WS event protocol (send_message/typing/read_receipt/join_room). Load history from
+   `GET /api/chat/rooms/:id/messages` (or the join_room `room_history` frame). Remove
+   `stream-chat`/`stream-chat-expo`/`stream-chat-react-native*` from `package.json`. (Also SEC-9:
+   move tokens to `expo-secure-store` — can ride along here or Stillwater P0.)
+2. **R5 — media → Cloudflare R2** (django-storages/boto3; port `/api/upload` + drop Cloudinary).
 3. Start **Pesapal merchant onboarding** (long pole, ~1–2 wk approval) — in parallel.
 4. After Phase R lands → Stillwater 0–10 on the Python backend.
 

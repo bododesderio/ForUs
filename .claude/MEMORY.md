@@ -136,3 +136,15 @@ Created: 2026-07-27
 - **Message sending is realtime (R4b), not REST.** getUserRooms last_message via Subquery(OuterRef). ChatMessage.objects (SoftDeleteManager) hides deleted.
 - **Verified:** 65 django tests green (59 + 6 chat), ruff clean.
 - **Resume R4b (FastAPI WS /ws):** events send_message/typing/read_receipt/join_room. BUG-7 persist-then-broadcast. Redis pub/sub fan-out (multi-worker; Node used in-proc Map). SEC-4 WS ticket auth (Redis ~30s single-use; add GET /api/chat/token in Django). SEC-2 membership on send+join_room history. Read backend/ws.js + ChatService.js (already read). Then R4c frontend ChatContext.js + drop stream-chat-* deps.
+
+## [2026-08-01] — Phase R4b: FastAPI WebSocket chat realtime
+- **Django side:** chat/tickets.py (issue_ticket → Redis SETEX ws:ticket:<t>=user_id, 30s) + WsTicketView (GET /api/chat/token). redis-py sync client, module-cached.
+- **FastAPI side:** app/chat/{tickets,repo,manager,ws}.py + main.py wiring.
+  - tickets.consume_ticket: redis.getdel (single-use, SEC-4). Falsy ticket → None without touching redis.
+  - repo (SA Core over reflected libs.db tables, async): is_member, member_ids, persist_message (UUID id + created/updated_at supplied since model uses auto_now_add = no DB default), touch_room, fetch_history (LEFT JOIN profiles for author fields, reversed oldest-first). FastAPI writes DML (messages) but never DDL.
+  - manager: ConnectionManager (user_id→set[ws], per-worker) + MembershipCache (10s TTL, room→member_ids to spare DB on typing spam). Uses time.monotonic (OK in app runtime; Date.now ban is workflow-scripts-only).
+  - ws.py: /ws endpoint. Auth via ?ticket. Events send_message/typing/read_receipt/join_room. BUG-7: persist inside engine.begin() transaction, publish to Redis channel "chat:events" ONLY after commit. SEC-2: is_member check on send AND join_room history (Node join_room lacked it). Fan-out: pubsub_listener task (started in lifespan) receives published events, resolves room members (cached), send_local to locally-connected members. Multi-worker via Redis (PERF-3..6; Node used in-proc Map).
+  - main.py lifespan: chat_manager, chat_members_cache, asyncio task pubsub_listener; add_api_websocket_route("/ws").
+- **Tests:** django chat/tests/test_ticket.py (needs redis → compose 10011). fastapi tests/test_chat_manager.py (unit, no infra), test_chat_ws.py (WS no-ticket reject via TestClient + guarded repo integration against compose DB 10010/redis 10011, seeded in a rolled-back transaction). CI: integration test SKIPS (fastapi CI job has no migrated schema); auth+unit run.
+- **Verified:** 78 tests (67 django + 11 fastapi), ruff clean. compose redis started (10011).
+- **Resume R4c (frontend):** ChatContext.js → wss://gateway/ws?ticket=(GET /api/chat/token); native WS protocol; remove stream-chat* deps. Then R5 media→R2.

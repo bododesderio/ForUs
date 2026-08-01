@@ -22,6 +22,19 @@ from accounts.models import User
 
 from .models import ChatMember, ChatMemberRole, ChatMessage, ChatRoom, ChatRoomType
 from .services import _iso, can_join, is_member, message_payload, profiles_for
+from .tickets import issue_ticket
+
+
+class WsTicketView(APIView):
+    """GET /api/chat/token → a short-lived single-use ticket for the WS handshake (SEC-4)."""
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request: Request) -> Response:
+        return Response(
+            {"success": True, "ticket": issue_ticket(request.user.id), "ws_path": "/ws"},
+            status=http.HTTP_200_OK,
+        )
 
 
 class RoomsView(APIView):

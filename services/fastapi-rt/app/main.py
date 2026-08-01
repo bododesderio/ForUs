@@ -9,6 +9,7 @@ Gateway routes /rt/** and /ws/** here.
 """
 from __future__ import annotations
 
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 
@@ -16,6 +17,8 @@ from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from libs.db import tables
 
+from .chat.manager import ConnectionManager, MembershipCache
+from .chat.ws import chat_ws, pubsub_listener
 from .db import check_database, check_redis, make_engine, make_redis
 
 logger = logging.getLogger("forus.rt")
@@ -32,14 +35,26 @@ async def lifespan(app: FastAPI):
         app.state.db_metadata = await tables.reflect(app.state.engine)
     except Exception:  # pragma: no cover - only when DB is unavailable at boot
         logger.warning("schema reflection deferred: database unavailable at startup")
+    # Realtime chat: per-worker registry + the Redis pub/sub fan-out listener.
+    app.state.chat_manager = ConnectionManager()
+    app.state.chat_members_cache = MembershipCache()
+    app.state.chat_pubsub = None
+    app.state.chat_task = asyncio.create_task(pubsub_listener(app))
     try:
         yield
     finally:
+        app.state.chat_task.cancel()
+        if app.state.chat_pubsub is not None:
+            try:
+                await app.state.chat_pubsub.aclose()
+            except Exception:  # pragma: no cover
+                pass
         await app.state.engine.dispose()
         await app.state.redis.aclose()
 
 
 app = FastAPI(title="ForUs Realtime", version="0.1.0", lifespan=lifespan)
+app.add_api_websocket_route("/ws", chat_ws)
 
 
 @app.get("/rt/health")
