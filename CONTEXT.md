@@ -6,12 +6,14 @@
 Last updated: 2026-08-01
 
 ## Current task
-**Phase R COMPLETE except R4c-2 (chat UI screens, needs Expo runtime). Node backend deleted (R7).**
-R7 cutover: nginx gateway routes `/api/**`→Django, `/rt/**`+`/ws`→FastAPI (fixed `/ws` exact-path
-routing); `dev.js` now boots the Python stack behind the gateway on `:10000`; **deleted `backend/`
-(Node, 48 files) + root `docker-compose.yml`**. Verified the full stack boots healthy through the
-gateway (`/api/health` 200, `/rt/health` 200, `/ws` upgrade→FastAPI 403-without-ticket, admin 200,
-Celery beat scheduling). 90 tests green. Only frontend chat-screen rewrite (R4c-2) remains in Phase R.
+**🎉 PHASE R COMPLETE (R0–R7). Node backend deleted, Python stack live, Stream Chat fully removed.**
+Next: **Stillwater 0–10** on the Python backend (+ Pesapal onboarding in parallel).
+R4c-2 (last piece) rewrote all chat UI off Stream onto the native `ChatContext`: shared
+`ChatRoomList`, native `ChatRoomScreen` (join + history, send, typing, read receipts), 3 chat tabs
+→ thin wrappers, deleted 2 orphaned Stream components, removed `stream-chat*` (51 pkgs pruned).
+Verified `tsc` clean on all chat files (no stream-chat imports; project total = pre-existing baseline).
+**Backend: 90 tests green, stack verified live. Frontend chat: type-clean but not yet runtime-tested
+(needs a simulator) — v1 defers reactions/threads; see `docs/R4c-2-chat-ui-handoff.md`.**
 R5: single Django upload path `POST /api/upload` → Cloudflare R2 via django-storages. **SEC-6**:
 oversize rejected before streaming (Django spools to temp, no 50 MB in-memory buffer), real
 content-type **sniffed from magic bytes** (client mimetype never trusted — a `.exe` renamed `.png`
@@ -172,7 +174,15 @@ Celery 10003, admin-web 10004, Node(transitional) 10005, Postgres 10010, Redis 1
 - **Current (Node, transitional):** raw SQL `$1,$2`; services throw, controllers catch.
 - Ports: never hardcode — derive from lane 10000 (`ports` skill + `~/.claude/PORTS.md`).
 
-## Next steps (finish R4 → R5)
+## Next steps (Phase R done → Stillwater)
+1. **Runtime-verify chat** on a device/simulator (`node dev.js`): room list, open room, two-client
+   send/typing/history. The only backend piece not exercised live is the WS message round-trip.
+2. **SEC-9** (deferred): move `accessToken`/`refreshToken` from AsyncStorage → `expo-secure-store`
+   in `src/services/api.js` (critical auth path — do with a runtime). Retire `cloudinaryUpload.ts`.
+3. **Stillwater 0–10** on the Python backend (payments P5 brings Pesapal + SEC-8 IPN HMAC).
+4. Start **Pesapal merchant onboarding** (long pole, ~1–2 wk approval) — in parallel.
+
+## Older next-steps (superseded — kept for history)
 1. **R4c-2 — chat UI screens (needs Expo runtime).** Rewrite `ChatRoomScreen.tsx` + `ChatComponent.tsx`
    + `CustomMessage.tsx` + `(users|consultants|tabs)/chat.tsx` + `_layout.tsx` off Stream components
    onto `useChatContext()` (native): room list via `fetchRooms()`, history via `loadHistory(roomId)`
