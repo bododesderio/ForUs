@@ -1,15 +1,20 @@
+<!--
+  @author Bodo Desderio <rooiboktechltd@gmail.com>
+  @copyright 2026 Rooibok Technologies. All rights reserved.
+-->
 # Project Context
-Last updated: 2026-07-31
+Last updated: 2026-08-01
 
 ## Current task
-**Phase R0 COMPLETE & verified — next up R1 (schema → Django models).** Express/Node →
+**Phase R1 COMPLETE & verified — next up R2 (auth: DRF SimpleJWT).** Express/Node →
 Django (DRF, core/CRUD/admin/payments) + FastAPI (realtime chat, video tokens,
 webhooks, AI/moderation), Postgres kept, big-bang pre-launch rewrite. Runs
 **before** the Stillwater feature migration. See `.claude/adrs/ADR-001-backend-replatform.md`
 + `docs/plans/backend-replatform-plan.md`.
-R0 scaffold (`services/django-api`, `services/fastapi-rt`, `libs/db`, `infra/`, CI) boots
-healthy behind the nginx gateway on lane 10000; audit captured in
-`docs/phase-R-hardening-requirements.md`. Node backend untouched. **Resume at R1 tomorrow.**
+R1 ported the 18-table source schema to **19 Django models** across 6 domain apps
+(UUID PKs, soft-delete managers, TextChoices, FK cascades); reversible initial
+migrations verified up+down; Django Admin lists all 19; FastAPI reads via SQLAlchemy
+Core reflection (`libs/db/tables.py`). Resolves ARCH-1, ARCH-4, BUG-6. Node backend untouched.
 
 ## What it is
 **ForUs** — a mobile-first mental wellness platform: therapist consultations,
@@ -53,6 +58,17 @@ Celery 10003, admin-web 10004, Node(transitional) 10005, Postgres 10010, Redis 1
 - Goals, streaks, voice journal, session notes, earnings, audit log, billing
   dashboard, cohort analytics — none (Phases 3, 8, 9, 10)
 
+## Recent decisions (2026-08-01)
+- **Phase R1 executed & verified.** 6 domain apps: `accounts`, `appointments`, `wellness`,
+  `content`, `chat`, `community`. **19 models** = 20 source tables − `refresh_tokens`
+  (→ SimpleJWT `token_blacklist`). All PKs UUID (incl. `chat_rooms`/`chat_messages`, formerly
+  Stream string IDs — realtime is now FastAPI-owned). `parent_id` kept as a loose pointer (no FK).
+- **App split**: models never move between apps after this (migration-history cost). Locked.
+- **BUG-6** fixed: `appointments.DEFAULT_DURATION_MINUTES = 60`, single source for serializers/services.
+- Fixed two latent R0 defects found during R1: broken structlog `LOGGING` (string processor →
+  every log record errored) and missing `bcrypt` dependency (any `set_password()` crashed).
+- `libs/db` now runtime-wired into the FastAPI image (build context → repo root); reflected at boot.
+
 ## Recent decisions (2026-07-31)
 - **Phase R0 executed & verified** (see below). Direction chosen: capture audit as Phase-R
   hardening requirements + scaffold R0; do **not** refactor the throwaway Node backend.
@@ -75,13 +91,14 @@ Celery 10003, admin-web 10004, Node(transitional) 10005, Postgres 10010, Redis 1
 - **Current (Node, transitional):** raw SQL `$1,$2`; services throw, controllers catch.
 - Ports: never hardcode — derive from lane 10000 (`ports` skill + `~/.claude/PORTS.md`).
 
-## Next steps (resume here tomorrow — START R1)
-1. **R1 — schema → Django models + migrations.** Port the 18 tables (`backend/db/schema.js`)
-   to Django models with **UUID PKs**, FK cascades, soft-delete managers, enums → `TextChoices`.
-   Reversible initial migration (via `migrations` skill). Wire Django Admin for every model.
-   Reflect the same tables into SQLAlchemy Core in `libs/db/tables.py`. Resolves ARCH-1, ARCH-4, BUG-6.
-   Acceptance: `migrate` up+down on scratch DB; Admin lists all models; FastAPI reads a row via Core.
-2. Start **Pesapal merchant onboarding** (long pole, ~1–2 wk approval) — in parallel with R1.
+## Next steps (START R2 — auth)
+1. **R2 — auth (DRF SimpleJWT).** Port register-user/consultant, login, refresh, logout,
+   change-password, push-token save. Access 15m / refresh 7d; blacklist on logout
+   (`token_blacklist` app already wired). Activity logging → Django signal into `accounts.Activity`.
+   ⚠ **Hasher fix required:** settings lists `BCryptSHA256PasswordHasher` first, which does NOT
+   read plain `bcryptjs` hashes — swap to `BCryptPasswordHasher` so Node hashes verify. `bcrypt`
+   is now a dependency (added in R1). Acceptance: parity harness green for `/api/auth/*`.
+2. Start **Pesapal merchant onboarding** (long pole, ~1–2 wk approval) — in parallel.
 3. After Phase R lands → Stillwater 0–10 on the Python backend.
 
 ## R0 done (2026-07-31) — scaffold verified booting healthy on lane 10000

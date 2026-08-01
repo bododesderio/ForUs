@@ -1,3 +1,7 @@
+# @author Bodo Desderio <rooiboktechltd@gmail.com>
+# @copyright 2026 Rooibok Technologies. All rights reserved.
+# Build context is the repo root so the image can include the shared `libs/` tree
+# (Django owns the schema; FastAPI reflects it via libs.db — ARCH-1).
 FROM python:3.12-slim
 
 ENV PYTHONUNBUFFERED=1 \
@@ -6,10 +10,11 @@ ENV PYTHONUNBUFFERED=1 \
 
 WORKDIR /app
 
-COPY pyproject.toml ./
+COPY services/fastapi-rt/pyproject.toml ./
 RUN pip install --upgrade pip && pip install .
 
-COPY . .
+COPY services/fastapi-rt/ ./
+COPY libs/ ./libs/
 
 EXPOSE 8000
 

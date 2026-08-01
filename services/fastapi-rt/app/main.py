@@ -9,18 +9,29 @@ Gateway routes /rt/** and /ws/** here.
 """
 from __future__ import annotations
 
+import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
+from libs.db import tables
 
 from .db import check_database, check_redis, make_engine, make_redis
+
+logger = logging.getLogger("forus.rt")
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     app.state.engine = make_engine()
     app.state.redis = make_redis()
+    # Reflect Django-owned tables once at boot. Tolerant: a cold DB must not block
+    # startup — health stays authoritative and the first reader re-reflects lazily.
+    app.state.db_metadata = None
+    try:
+        app.state.db_metadata = await tables.reflect(app.state.engine)
+    except Exception:  # pragma: no cover - only when DB is unavailable at boot
+        logger.warning("schema reflection deferred: database unavailable at startup")
     try:
         yield
     finally:

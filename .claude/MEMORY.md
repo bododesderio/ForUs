@@ -1,3 +1,7 @@
+<!--
+  @author Bodo Desderio <rooiboktechltd@gmail.com>
+  @copyright 2026 Rooibok Technologies. All rights reserved.
+-->
 # Project Memory
 Created: 2026-07-27
 
@@ -54,3 +58,20 @@ Created: 2026-07-27
 - **Artifacts:** ADR-001, `docs/plans/backend-replatform-plan.md`, `docs/plans/stillwater-implementation-plan.md`. Nothing committed.
 - **Resume:** Phase R0 scaffolding + start Pesapal merchant onboarding. See CONTEXT.md "Next steps".
 
+
+## [2026-08-01] — Phase R1 complete: 18-table schema → 19 Django models
+- **Decisions:**
+  - 6 domain apps: accounts / appointments / wellness / content / chat / community (locked — no cross-app model moves).
+  - 19 models = 20 source tables − `refresh_tokens` (→ SimpleJWT `token_blacklist`). `AUTH_USER_MODEL=accounts.User` (email login, UUID PK).
+  - ALL PKs UUID incl. chat_rooms/chat_messages (were Stream string IDs; realtime now FastAPI-owned). `parent_id` = loose UUID pointer, no FK (matches source).
+  - Abstract bases in `core/models.py`: UUIDModel, CreatedModel, TimeStampedModel, SoftDeleteModel (+ managers). Compose per table's timestamp/soft-delete shape.
+- **Patterns:**
+  - `libs/db/tables.py`: async `reflect(engine)` → shared MetaData; `table(name)` → Core Table. FastAPI reflects at boot (lifespan), reads read-only.
+  - FastAPI image build context = repo root so `libs/` is baked in; pytest `pythonpath=["../.."]` so `libs.db` imports from the service dir.
+  - Schema parity > lint: `ignore=["DJ001"]` (nullable string cols match source), migrations excluded from ruff.
+- **Gotchas (R0 defects found & fixed in R1):**
+  - `LOGGING` passed `processor` as a dotted STRING → ProcessorFormatter tried to call a str → every log record errored. Fix: real `JSONRenderer()` + `foreign_pre_chain`.
+  - `bcrypt` not in django-api deps → any `set_password()` crashed (hasher lib missing). Added `bcrypt>=4.1`.
+  - ⚠ R2: settings lists `BCryptSHA256PasswordHasher` first — does NOT read plain `bcryptjs` hashes. Swap to `BCryptPasswordHasher` in R2.
+- **Verified:** migrate up+down+up on scratch DB (compose pg, host 10010); Admin lists all 19; Core reads a UUID user row; ruff+pytest green both services; fastapi image builds with libs.
+- **Resume:** R2 (DRF SimpleJWT auth) + Pesapal onboarding. See CONTEXT.md "Next steps".

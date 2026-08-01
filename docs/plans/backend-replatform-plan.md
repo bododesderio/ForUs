@@ -1,3 +1,7 @@
+<!--
+  @author Bodo Desderio <rooiboktechltd@gmail.com>
+  @copyright 2026 Rooibok Technologies. All rights reserved.
+-->
 # ForUs — Backend Re-platform Plan (Phase R)
 
 **Decision record:** `.claude/adrs/ADR-001-backend-replatform.md`
@@ -56,7 +60,7 @@ infra/ (docker-compose, nginx)     frontend/ (unchanged Expo app)
 - **Accept:** `docker compose up` boots all services healthy; gateway routes `/api/health` (Django)
   and `/rt/health` (FastAPI). **Rollback:** delete `services/` — Node untouched.
 
-## R1 · Schema → Django models + migrations  — Est 5–7 p-days · blocked-by: R0
+## R1 · Schema → Django models + migrations  — ✅ DONE 2026-08-01 · blocked-by: R0
 - Port the 18 tables (`backend/db/schema.js`) to Django models with **UUID PKs**, FK cascades,
   soft-delete managers, enums → `TextChoices`. Keep `refresh_tokens` semantics via SimpleJWT
   blacklist; keep `password_reset_tokens`, `community_*` (wired later by Stillwater).

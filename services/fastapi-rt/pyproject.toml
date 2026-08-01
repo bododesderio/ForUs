@@ -43,3 +43,6 @@ ignore = ["E501"]
 python_files = ["test_*.py"]
 addopts = "-q"
 asyncio_mode = "auto"
+# Repo root on the path so the shared `libs.db` reflection package imports in CI,
+# where pytest runs from this service directory.
+pythonpath = ["../.."]

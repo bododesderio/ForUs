@@ -49,9 +49,21 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "rest_framework",
+    "rest_framework_simplejwt.token_blacklist",  # replaces the source `refresh_tokens` table
     "corsheaders",
     "core",
+    # ─── Domain apps (Django owns the schema — ARCH-1) ──────────────────────────
+    "accounts",
+    "appointments",
+    "wellness",
+    "content",
+    "chat",
+    "community",
 ]
+
+# Custom identity model — email login, role-based, UUID PK. Must be set before the
+# first migration; changing it afterwards is effectively irreversible.
+AUTH_USER_MODEL = "accounts.User"
 
 MIDDLEWARE = [
     "corsheaders.middleware.CorsMiddleware",
@@ -182,13 +194,25 @@ if not DEBUG:
     CSRF_COOKIE_SECURE = True
 
 # ─── Structured logging (structlog; no console.log-style leakage, SEC-7) ────────
+# ProcessorFormatter needs a real processor callable and a foreign_pre_chain so
+# plain-stdlib records (Django's own) render as JSON too — passing dotted-path
+# strings here silently breaks formatting.
+import structlog  # noqa: E402
+
+_LOG_FOREIGN_PRE_CHAIN = [
+    structlog.contextvars.merge_contextvars,
+    structlog.processors.add_log_level,
+    structlog.processors.TimeStamper(fmt="iso"),
+]
+
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
     "formatters": {
         "json": {
             "()": "structlog.stdlib.ProcessorFormatter",
-            "processor": "structlog.processors.JSONRenderer",
+            "processor": structlog.processors.JSONRenderer(),
+            "foreign_pre_chain": _LOG_FOREIGN_PRE_CHAIN,
         },
     },
     "handlers": {
