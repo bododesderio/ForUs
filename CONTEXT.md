@@ -6,16 +6,19 @@
 Last updated: 2026-08-01
 
 ## Current task
-**Phase R3 IN PROGRESS — R3a+R3b done, next R3c (appointments) + R3d (users).**
+**Phase R3 IN PROGRESS — R3a+R3b+R3c done, only R3d (users) left.**
 Express/Node → Django (DRF, core/CRUD/admin/payments) + FastAPI (realtime chat,
 video tokens, webhooks, AI/moderation), Postgres kept, big-bang pre-launch rewrite.
 Runs **before** the Stillwater feature migration. See ADR-001 + `docs/plans/backend-replatform-plan.md`.
 R3 ports 6 CRUD domains (~42 endpoints) via DRF APIViews with path/shape parity:
 - **R3a done:** `mood` (2) + `activities` (1).
 - **R3b done:** `events` (5, BUG-4 fixed: non-admin → 403, proper partial update) + `resources` (2).
-- **R3c todo:** `appointments` (15: conflict detection, state machine, reviews, auto-cancel).
+- **R3c done:** `appointments` (15: conflict detection, state machine, reviews, auto-cancel,
+  availability, block-slot). BUG-6 default (60) applied on create/block. **Closed a latent IDOR**:
+  `/user/<id>` + `/consultant/<id>` lists now require owner-or-admin (Node had no check).
+  Push notifications on transitions deferred to R6 (Celery).
 - **R3d todo:** `users` (17: profile, consultants, notifications, push-token).
-33 django tests green. Shared `core/permissions.py` (`IsAdminRole`).
+49 django tests green. Shared `core/permissions.py` (`IsAdminRole`).
 
 ## What it is
 **ForUs** — a mobile-first mental wellness platform: therapist consultations,
@@ -58,6 +61,21 @@ Celery 10003, admin-web 10004, Node(transitional) 10005, Postgres 10010, Redis 1
 - Crisis SOS / safety plans / moderation — none (Phases 7, 9)
 - Goals, streaks, voice journal, session notes, earnings, audit log, billing
   dashboard, cohort analytics — none (Phases 3, 8, 9, 10)
+
+## Recent decisions (2026-08-01, R3c)
+- **Appointments ported** (15 eps) via APIViews + `appointments/services.py` (auto-cancel, conflict
+  detection, perspective join builder, filtered pagination).
+- **Conflict detection**: point-in-interval over active statuses (existing.start ≤ new_start ≤
+  existing.end), faithful to Node's start-instant check. Reused on create + reschedule (excludes self).
+- **Auto-cancel**: pending/confirmed with start >15 min past → cancelled `Missed/Expired`, run on every
+  list fetch (bulk `.update()` with explicit `updated_at`). Celery schedule is R6; logic lives here.
+- **[SECURITY] IDOR closed**: `/appointments/user/<id>` and `/consultant/<id>` now require the caller
+  to be the owner or an admin. Node exposed any user's therapist appointments to any authed caller;
+  the frontend only fetches its own, so legitimate flows are unaffected. Availability stays open (booking).
+- **State machine**: confirm/reject only from `pending`; users may only cancel or start-session via
+  `/status`; consultants own their appts. Review requires a `completed` appt + is unique per (user,consultant);
+  writes refresh `consultant_details.rating`.
+- **Push notifications deferred to R6** — transitions complete without them.
 
 ## Recent decisions (2026-08-01, R3a+R3b)
 - **DRF APIViews (not ModelViewSets)** — the Node paths are non-RESTful (`/events/get`,
@@ -120,18 +138,14 @@ Celery 10003, admin-web 10004, Node(transitional) 10005, Postgres 10010, Redis 1
 - **Current (Node, transitional):** raw SQL `$1,$2`; services throw, controllers catch.
 - Ports: never hardcode — derive from lane 10000 (`ports` skill + `~/.claude/PORTS.md`).
 
-## Next steps (finish R3)
-1. **R3c — `/api/appointments` (15 eps).** create, get user/consultant/availability, /get filtered,
-   /all, PATCH :id/status, reviews (+ paginated consultant reviews), block, confirm, reject,
-   reschedule, cancel, start-session. **Conflict detection** on create/block + **auto-cancel** of
-   expired pending (Celery in R6, logic here). State machine over `AppointmentStatus`. BUG-6 default
-   already in the model. Read `AppointmentController.js` + `AppointmentServices.js` for exact shapes.
-2. **R3d — `/api/users` (17 eps).** profile, update-profile, user/:id, consultant/:id, consultants,
+## Next steps (finish R3 → R3d, then R4)
+1. **R3d — `/api/users` (17 eps).** profile, update-profile, user/:id, consultant/:id, consultants,
    users, delete/user|consultant/:id, push-token (+consultant), notifications save/list/read,
    notification-preference. Reuse `build_user_payload`, `record_activity`. Frontend's
    `/users/push-token` + `/users/consultant/push-token` land here. Resolves ARCH-3, PERF-1 (reads).
-3. Start **Pesapal merchant onboarding** (long pole, ~1–2 wk approval) — in parallel.
-4. After Phase R lands → Stillwater 0–10 on the Python backend.
+   Read `UserController.js` + `UserServices.js`. Apply the same owner-or-admin guard on `/user/:id`.
+2. Start **Pesapal merchant onboarding** (long pole, ~1–2 wk approval) — in parallel.
+3. After Phase R lands → Stillwater 0–10 on the Python backend.
 
 ## R0 done (2026-07-31) — scaffold verified booting healthy on lane 10000
 - `services/django-api/` (Django 5 + DRF, SimpleJWT rotation+blacklist, fail-fast env, structlog,

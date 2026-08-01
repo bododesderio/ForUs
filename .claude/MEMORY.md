@@ -103,3 +103,16 @@ Created: 2026-07-27
 - **Files:** core/permissions.py; wellness/{serializers,views,urls}.py; content/{serializers,views,urls}.py; accounts ActivityListView + serializer + urls_activities.py; forus/urls.py mounts (/api/mood, /api/activities, /api/ for content). Tests: wellness/tests/test_mood, content/tests/test_{events,resources}, accounts/tests/test_activities.
 - **Gotchas:** mount /api/mood via path("api/mood", include(wellness.urls)) + path("") to avoid trailing-slash redirect. content mounted at path("api/") alongside core — full subpaths (events/..., resources).
 - **Verified:** 33 django tests green (16 prior + 17 new), ruff clean. **Resume:** R3c appointments (read AppointmentController.js + AppointmentServices.js; conflict detection + auto-cancel + state machine), then R3d users.
+
+## [2026-08-01] — Phase R3c: appointments (15 eps, DRF)
+- **Files:** appointments/{services,views,urls}.py + tests/test_appointments.py; forus/urls.py (+/api/appointments/). Logic in services.py, status/shape decisions in views (parity-visible).
+- **Decisions:**
+  - Conflict detection = point-in-interval over ACTIVE_STATUSES (pending/confirmed/in_session): existing.start ≤ new_start ≤ existing.start+duration. Filter appointment_datetime__lte=new_start then check end in Python. Reused on create + reschedule (exclude_id=self).
+  - Auto-cancel: pending/confirmed with start < now-15min → bulk .update(status=cancelled, reason='Missed/Expired', updated_at=now). Runs on every list fetch. Celery schedule is R6.
+  - BUG-6: create/block default duration = DEFAULT_DURATION_MINUTES (60), not Node's 90.
+  - [SECURITY] Closed latent IDOR: /appointments/user/<id> + /consultant/<id> require owner-or-admin (Node had none). Availability stays open (booking needs it). No R3 finding mandated this — proactive.
+  - State machine: confirm/reject only from pending (ConfirmView._transition reused by reject); users may only cancel/in_session via /status; review needs a completed appt + unique per (user,consultant), refreshes consultant_details.rating.
+  - Perspective join (build_appointment_list): user/consultant/admin get different joined profile+email+review fields matching Node SELECT column names; batched (no N+1).
+  - Push notifications on transitions all deferred to R6.
+- **Gotchas:** UUID PKs → dropped Node's isNaN(consultantId) validity check (always true for UUIDs). URL order: literal (create/get/all/block) + typed converters; consultant/<id>/availability distinct from consultant/<id>.
+- **Verified:** 49 django tests green (33 prior + 16 appt), ruff clean. **Resume:** R3d users (17 eps) — last of R3; read UserController.js + UserServices.js; apply same owner-or-admin guard.

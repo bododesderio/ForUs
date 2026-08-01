@@ -78,7 +78,8 @@ infra/ (docker-compose, nginx)     frontend/ (unchanged Expo app)
   **Rollback:** gateway routes `/api/auth` back to Node.
 
 ## R3 · Core CRUD domains (DRF)  — 🚧 IN PROGRESS (R3a+R3b done 2026-08-01) · blocked-by: R2
-> Done: `mood`, `activities`, `events` (BUG-4 fixed), `resources`. Remaining: `appointments`, `users`.
+> Done: `mood`, `activities`, `events` (BUG-4 fixed), `resources`, `appointments` (conflict
+> detection, state machine, auto-cancel, reviews; latent IDOR closed). Remaining: `users`.
 Port these route groups to DRF viewsets/serializers, preserving paths/shapes:
 `/api/users` · `/api/appointments` (incl. conflict detection, auto-cancel, confirm/reject/reschedule/
 cancel, reviews, start-session) · `/api/events` · `/api/mood` · `/api/resources` · `/api/activities`.
