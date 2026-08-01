@@ -88,7 +88,8 @@ Admin/consultant route stubs stay stubs (Stillwater Phase 9 fills them).
 - **Accept:** parity harness green per group; appointment conflict + auto-cancel behavior matches Node.
   **Rollback:** per-group gateway route back to Node (this is why we port group-by-group).
 
-## R4 · Realtime chat on FastAPI  — Est 8–11 p-days · blocked-by: R1 (R3 recommended)
+## R4 · Realtime chat on FastAPI  — 🚧 IN PROGRESS (R4a done 2026-08-01) · blocked-by: R1 (R3 recommended)
+> R4a: Django chat REST (rooms/messages/join, SEC-2). Remaining: R4b FastAPI WS (Redis pub/sub, BUG-7, SEC-4), R4c frontend + drop Stream.
 - Port `/api/chat` room/message REST to Django; move the realtime layer (currently `ws.js` + Stream
   Chat) to **FastAPI WebSockets** at `/ws/**`, fanning out via **Redis pub/sub** (multi-worker).
   Persist to `chat_messages`/`message_reactions`. **Drop Stream Chat** (`getstream`, `stream-chat`).

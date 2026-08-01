@@ -127,3 +127,12 @@ Created: 2026-07-27
 - **R3 COMPLETE:** 6 domains, ~42 eps, 59 django tests. Resolves BUG-4, BUG-6, ARCH-2, ARCH-3, PERF-1(reads) + 3 proactive security fixes. Push delivery + auto-cancel scheduling → R6.
 - **Gotchas:** URL order — consultant/{notifications,push-token,send-notification} literals before consultant/<uuid:pk> (uuid converter is strict so safe either way). NotificationsView reused for /notifications and /consultant/notifications (Node getConsultantNotifications == getNotificationsForUser(req.user.id)).
 - **Resume:** R4 — chat REST to Django + realtime to FastAPI WS (Redis pub/sub), drop Stream Chat. SEC-2/SEC-4/BUG-7/PERF-3..6/ARCH-5. Read chatRoutes.js, ChatController.js, ChatService.js, ws.js; frontend ChatContext.js.
+
+## [2026-08-01] — Phase R4a: chat REST (Django)
+- **Files:** chat/{services,views,urls}.py + tests/test_chat.py; forus/urls.py (+/api/chat/).
+- **Endpoints:** POST/GET /api/chat/rooms (create + list, one RoomsView — Node served both on same path), GET /rooms/<uuid>/messages (membership-gated 403, paginated limit/before, joined profile fields, reversed asc), POST /rooms/<uuid>/join.
+- **SEC-2 join authz (chat/services.can_join):** already-member OR room.type in {livestream,team} (open) OR appointment links requester to a current member (Appointment where user/consultant matches a member). Messaging rooms deny arbitrary self-join. History (getRoomMessages) already membership-gated in Node — kept.
+- **Dropped Stream:** /token + /webhook routes gone. Token issuance → WS ticket in R4b.
+- **Message sending is realtime (R4b), not REST.** getUserRooms last_message via Subquery(OuterRef). ChatMessage.objects (SoftDeleteManager) hides deleted.
+- **Verified:** 65 django tests green (59 + 6 chat), ruff clean.
+- **Resume R4b (FastAPI WS /ws):** events send_message/typing/read_receipt/join_room. BUG-7 persist-then-broadcast. Redis pub/sub fan-out (multi-worker; Node used in-proc Map). SEC-4 WS ticket auth (Redis ~30s single-use; add GET /api/chat/token in Django). SEC-2 membership on send+join_room history. Read backend/ws.js + ChatService.js (already read). Then R4c frontend ChatContext.js + drop stream-chat-* deps.

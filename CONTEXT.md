@@ -6,7 +6,15 @@
 Last updated: 2026-08-01
 
 ## Current task
-**Phase R3 COMPLETE — next up R4 (realtime chat on FastAPI).**
+**Phase R4 IN PROGRESS — R4a (Django chat REST) done; next R4b (FastAPI WS) + R4c (frontend).**
+R4a ported the chat REST surface to Django: `POST/GET /api/chat/rooms`, `GET /rooms/:id/messages`
+(membership-gated), `POST /rooms/:id/join` (**SEC-2 authorized**: already-member OR open room type
+OR appointment-linked). Stream `/token` + `/webhook` dropped. Message *sending* is realtime (R4b).
+65 django tests green. **R4b:** FastAPI WS at `/ws` — Redis pub/sub fan-out (multi-worker, PERF-3..6),
+persist-then-broadcast (BUG-7), WS ticket auth (SEC-4), membership checks on every op (SEC-2).
+**R4c:** repoint `ChatContext.js`, remove `stream-chat-*` deps.
+
+## Superseded — Phase R3 COMPLETE (next up R4 realtime chat)
 Express/Node → Django (DRF, core/CRUD/admin/payments) + FastAPI (realtime chat,
 video tokens, webhooks, AI/moderation), Postgres kept, big-bang pre-launch rewrite.
 Runs **before** the Stillwater feature migration. See ADR-001 + `docs/plans/backend-replatform-plan.md`.
@@ -148,14 +156,17 @@ Celery 10003, admin-web 10004, Node(transitional) 10005, Postgres 10010, Redis 1
 - **Current (Node, transitional):** raw SQL `$1,$2`; services throw, controllers catch.
 - Ports: never hardcode — derive from lane 10000 (`ports` skill + `~/.claude/PORTS.md`).
 
-## Next steps (START R4 — realtime chat on FastAPI)
-1. **R4 — chat.** Port `/api/chat` room/message REST to Django (DRF), move the realtime layer
-   (Node `ws.js` + Stream Chat) to **FastAPI WebSockets** at `/ws/**`, fanning out via **Redis
-   pub/sub** (multi-worker). Persist to `chat_messages`/`message_reactions`. **Drop Stream Chat.**
-   Resolves SEC-2 (room membership authz), SEC-4 (WS token in query), BUG-7 (persist-then-broadcast),
-   PERF-3..6, ARCH-5. Frontend: repoint `ChatContext.js` WS URL; remove `stream-chat-*` deps.
-2. Start **Pesapal merchant onboarding** (long pole, ~1–2 wk approval) — in parallel.
-3. After Phase R lands → Stillwater 0–10 on the Python backend.
+## Next steps (finish R4)
+1. **R4b — FastAPI WS** at `/ws`. Events: send_message, typing, read_receipt, join_room.
+   **Persist-then-broadcast** (BUG-7 — Node broadcast before a fire-and-forget insert).
+   **Redis pub/sub** fan-out so messages reach connections on other workers (PERF-3..6; Node used an
+   in-process Map). **WS ticket auth** — REST issues a short-lived single-use ticket (Redis, ~30s TTL),
+   WS handshake exchanges it (SEC-4, no bearer token in the URL). Membership check on send + join_room
+   history (SEC-2). Add `GET /api/chat/token` (Django) → issues the WS ticket.
+2. **R4c — frontend.** Repoint `ChatContext.js` WS URL to the FastAPI gateway path; swap the token
+   call for the ticket flow; remove `stream-chat`/`stream-chat-expo`/`stream-chat-react-native*`.
+3. Start **Pesapal merchant onboarding** (long pole, ~1–2 wk approval) — in parallel.
+4. After Phase R lands → Stillwater 0–10 on the Python backend.
 
 ## R0 done (2026-07-31) — scaffold verified booting healthy on lane 10000
 - `services/django-api/` (Django 5 + DRF, SimpleJWT rotation+blacklist, fail-fast env, structlog,
