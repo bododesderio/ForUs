@@ -23,6 +23,7 @@ from rest_framework.views import APIView
 from accounts.models import ConsultantDetails, Profile, Role, User
 from accounts.services import record_activity
 from core.permissions import ADMIN_ROLES
+from core.push import notify
 
 from .models import DEFAULT_DURATION_MINUTES, Appointment, AppointmentStatus, Review
 from .services import (
@@ -93,6 +94,12 @@ class CreateAppointmentView(APIView):
         record_activity(
             request.user, "appointment_create", f"Created appointment with consultant ID {consultant_id}"
         )
+        when = appt.appointment_datetime.isoformat()
+        data_ref = {"appointmentId": str(appt.id)}
+        notify(request.user, "Appointment Booked", f"Your appointment is scheduled for {when}", data_ref)
+        consultant_user = User.objects.filter(pk=consultant_id).first()
+        if consultant_user is not None:
+            notify(consultant_user, "New Appointment", f"You have a new appointment on {when}", data_ref)
         return Response(
             {"success": True, "message": "Appointment created successfully", "appointment": appointment_base_dict(appt)},
             status=http.HTTP_201_CREATED,
@@ -193,6 +200,13 @@ def _apply_status(request, appointment_id, new_status, cancellation_reason=None)
     appt.status = new_status
     appt.cancellation_reason = cancellation_reason
     appt.save(update_fields=["status", "cancellation_reason", "updated_at"])
+    if new_status in {AppointmentStatus.CANCELLED, AppointmentStatus.IN_SESSION}:
+        title = "Appointment Cancelled" if new_status == AppointmentStatus.CANCELLED else "Session Started"
+        when = appt.appointment_datetime.isoformat()
+        data_ref = {"appointmentId": str(appt.id)}
+        for party in (appt.user, appt.consultant):
+            if party is not None:
+                notify(party, title, f"{title}: your appointment on {when}", data_ref)
     return Response({"success": True, "message": "Appointment status updated successfully"}, status=http.HTTP_200_OK)
 
 
@@ -223,7 +237,17 @@ class ConfirmView(APIView):
     def post(self, request: Request, pk) -> Response:
         if request.user.role != Role.CONSULTANT:
             return _err("Only consultants can confirm appointments", http.HTTP_403_FORBIDDEN)
-        return self._transition(request, pk, AppointmentStatus.CONFIRMED, "Appointment confirmed", "confirm")
+        resp = self._transition(request, pk, AppointmentStatus.CONFIRMED, "Appointment confirmed", "confirm")
+        if resp.status_code == http.HTTP_200_OK:
+            appt = Appointment.objects.filter(pk=pk).first()
+            if appt is not None and appt.user is not None:
+                notify(
+                    appt.user,
+                    "Appointment Confirmed",
+                    f"Your appointment on {appt.appointment_datetime.isoformat()} was confirmed",
+                    {"appointmentId": str(pk)},
+                )
+        return resp
 
     @staticmethod
     def _transition(request, pk, target, ok_message, verb) -> Response:
@@ -306,6 +330,9 @@ class ReviewView(APIView):
 
         avg = Review.objects.filter(consultant_id=consultant_id).aggregate(a=Avg("rating"))["a"] or 0
         ConsultantDetails.objects.filter(user_id=consultant_id).update(rating=round(float(avg), 2))
+        consultant_user = User.objects.filter(pk=consultant_id).first()
+        if consultant_user is not None:
+            notify(consultant_user, "New Review Received", "You received a new review from a patient.", {})
         return Response({"success": True, "message": "Review added successfully"}, status=http.HTTP_200_OK)
 
 
