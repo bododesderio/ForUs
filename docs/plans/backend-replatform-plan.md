@@ -55,7 +55,7 @@ infra/ (docker-compose, nginx)     frontend/ (unchanged Expo app)
   `pydantic-settings`).
 - `libs/db/` shared config + SQLAlchemy Core table reflections.
 - `infra/docker-compose.yml` (postgres 16, redis 7, django, fastapi, celery, nginx) + nginx
-  path routing. `.env.example` rewritten (Firebase + MinIO removed; Redis/R2/Pesapal/Agora/Resend keys).
+  path routing. `.env.example` rewritten (Firebase + legacy media provider removed; Redis/R2/Pesapal/Agora/Resend keys).
 - CI: add Python lint (ruff) + test (pytest) jobs.
 - **Accept:** `docker compose up` boots all services healthy; gateway routes `/api/health` (Django)
   and `/rt/health` (FastAPI). **Rollback:** delete `services/` — Node untouched.
@@ -99,12 +99,12 @@ Admin/consultant route stubs stay stubs (Stillwater Phase 9 fills them).
   workers; history loads from Postgres. **Rollback:** point WS back to `ws.js`; keep Stream deps until R7.
 
 ## R5 · Media consolidation → Cloudflare R2  — ✅ DONE (backend) 2026-08-01 · blocked-by: R1
-> Django POST /api/upload → R2 (django-storages). SEC-6: size cap before stream, magic-byte content sniff (client mimetype untrusted), random key, {success,url} parity. Cloudinary gone server-side; frontend cloudinaryUpload.ts retire = R4c-2/R7. 6 tests.
+> Django POST /api/upload → R2 (django-storages). SEC-6: size cap before stream, magic-byte content sniff (client mimetype untrusted), random key, {success,url} parity. Media fully on R2 server-side; frontend legacy uploader retire = R4c-2/R7. 6 tests.
 - `django-storages` + `boto3` → R2 (S3-compatible endpoint, `region='auto'`). Port `/api/upload`
-  (multer) **and** the residual client-direct `/cloudinary-signature` route to a single Django upload
+  (multer) **and** the residual client-direct signature route to a single Django upload
   path — either server-side put returning a public/custom-domain R2 URL, or a **presigned R2 PUT**.
-  **Remove Cloudinary entirely** (route + `cloudinary` dep).
-- Frontend: `cloudinaryUpload.ts`/`uploadService.ts` repoint to the R2 upload/presigned flow.
+  **Remove the legacy media provider entirely** (route + dep).
+- Frontend: the upload services repoint to the R2 upload/presigned flow.
 - Transforms: R2 has none native — add **Cloudflare Images** only if server-side resizing is required;
   otherwise resize client-side with `expo-image-manipulator` (already a dep).
 - **Accept:** image + audio upload round-trips through R2, served via public/custom-domain URL.
@@ -122,8 +122,8 @@ Admin/consultant route stubs stay stubs (Stillwater Phase 9 fills them).
 > Deleted `backend/` (Node, 48 files) + root `docker-compose.yml`. Stack verified healthy through the
 > gateway (api/rt/ws/admin + Celery beat). 90 tests. Remaining Phase-R item: R4c-2 chat UI screens (Expo).
 - Gateway routes **100%** of `/api` + `/ws` to Python. Run parity harness full-suite; soak 48h in staging.
-- Remove `backend/` (Node) and Stream Chat deps. (Firebase + MinIO already removed 2026-07-27;
-  Cloudinary removed at R5.) Update README, CONTEXT,
+- Remove `backend/` (Node) and Stream Chat deps. (Firebase + legacy media provider already removed 2026-07-27;
+  server-side upload consolidated to R2 at R5.) Update README, CONTEXT,
   docker-compose, CI to Python-only. Tag `v-backend-python`.
 - **Accept:** Expo app works end-to-end against Python only; Node deleted; CI green.
   **Rollback (last resort):** revert the cutover commit — Node returns until the tag is deleted.

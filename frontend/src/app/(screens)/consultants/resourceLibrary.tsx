@@ -25,9 +25,8 @@ import { useAuth } from '../../../context/authContext';
 import { StatusBar } from 'expo-status-bar';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
-import { uploadResource as uploadToCloudinary, CloudinarySignatureResponse } from '../../../services/cloudinaryUpload';
+import { uploadFile as uploadToR2 } from '../../../services/uploadService';
 import { uploadResource as uploadResourceApi, fetchResources as fetchResourcesApi } from '../../../services/api';
-import { API_BASE_URL } from '../../../services/api';
 
 const { width } = Dimensions.get('window');
 
@@ -267,20 +266,17 @@ export default function MediaLibraryScreen() {
     }
     setIsUploading(true);
     try {
-      // 1. Upload file to Cloudinary
-      const backendSignatureUrl = `${API_BASE_URL}/cloudinary-signature?folder=resources`; // Replace with your backend URL
-      const fileUrl = await uploadToCloudinary(
+      // 1. Upload file to Cloudflare R2 (via the Django /api/upload path)
+      const fileUrl = await uploadToR2(
         formData.file.uri,
-        backendSignatureUrl,
         formData.file.mimeType || 'application/octet-stream',
         formData.file.name || 'resource'
       );
       // 2. Upload preview image if present
       let previewImageUrl = '';
       if (formData.previewImage?.uri) {
-        previewImageUrl = await uploadToCloudinary(
+        previewImageUrl = await uploadToR2(
           formData.previewImage.uri,
-          backendSignatureUrl,
           formData.previewImage.mimeType || 'image/jpeg',
           formData.previewImage.name || 'preview.jpg'
         );

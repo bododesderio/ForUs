@@ -27,7 +27,7 @@ R5: single Django upload path `POST /api/upload` → Cloudflare R2 via django-st
 oversize rejected before streaming (Django spools to temp, no 50 MB in-memory buffer), real
 content-type **sniffed from magic bytes** (client mimetype never trusted — a `.exe` renamed `.png`
 is rejected), random key, returns `{success, url}` (Node parity). 84 tests green (73 Django + 11 FastAPI).
-Cloudinary is gone server-side; only the frontend `cloudinaryUpload.ts` + client uploads remain to
+Media is on Cloudflare R2 server-side; the frontend upload screens still need repointing to
 retire (frontend, with R4c-2). `uploadService.ts` already targets `/api/upload` — no change needed.
 
 ## Superseded — Phase R4 (R4a+R4b done, R4c-1 done; R4c-2 chat UI screens remains)
@@ -171,7 +171,7 @@ Celery 10003, admin-web 10004, Node(transitional) 10005, Postgres 10010, Redis 1
 ## Recent decisions (2026-07-27)
 - **Backend re-platform** approved in principle: Express/Node → Django+FastAPI,
   big-bang pre-launch rewrite, runs BEFORE Stillwater (ADR-001). *Awaiting go for execution.*
-- **Storage** → Cloudflare R2 (S3-compatible, zero egress). MinIO removed; Cloudinary
+- **Storage** → Cloudflare R2 (S3-compatible, zero egress). Legacy media providers
   retired at R5. Firebase deleted (was dead config).
 - **Redis** confirmed load-bearing (unused today; wired in Phase R).
 - **Ports** normalized to lane 10000 (registry updated); `:4000` drift was stale.
@@ -187,7 +187,7 @@ Celery 10003, admin-web 10004, Node(transitional) 10005, Postgres 10010, Redis 1
 1. **Runtime-verify chat** on a device/simulator (`node dev.js`): room list, open room, two-client
    send/typing/history. The only backend piece not exercised live is the WS message round-trip.
 2. **SEC-9** (deferred): move `accessToken`/`refreshToken` from AsyncStorage → `expo-secure-store`
-   in `src/services/api.js` (critical auth path — do with a runtime). Retire `cloudinaryUpload.ts`.
+   in `src/services/api.js` (critical auth path — do with a runtime).
 3. **Stillwater 0–10** on the Python backend (payments P5 brings Pesapal + SEC-8 IPN HMAC).
 4. Start **Pesapal merchant onboarding** (long pole, ~1–2 wk approval) — in parallel.
 
@@ -200,8 +200,8 @@ Celery 10003, admin-web 10004, Node(transitional) 10005, Postgres 10010, Redis 1
    `package.json` and any `OverlayProvider`/Stream client wiring. Verify by running the app. (Bundle
    SEC-9: move tokens to `expo-secure-store`.)
 2. **R7 — cutover + delete Node.** Gateway routes all `/api/**` to Django, `/ws` to FastAPI; run the
-   parity harness green; delete `backend/`. Retire frontend `cloudinaryUpload.ts` + `stream-chat-*`
-   (R4c-2). Remove the transitional Node port (10005) + `getstream`/`cloudinary` deps. PERF-6 (dep removal).
+   parity harness green; delete `backend/`. Retire the frontend legacy media uploader + `stream-chat-*`
+   (R4c-2). Remove the transitional Node port (10005) + `getstream` and legacy-media deps. PERF-6 (dep removal).
 3. **R4c-2 — chat UI screens** (needs Expo runtime). **Blocked on a device/simulator** — 4,294 lines
    of Stream-based RN UI across 6 files; can't be rewritten/verified without `tsc` + a runtime (frontend
    deps aren't installed here). Precise build spec: **`docs/R4c-2-chat-ui-handoff.md`**. The native

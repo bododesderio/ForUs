@@ -13,7 +13,7 @@
 ForUs is **pre-launch** (no live users/data; payments, video, and the Stillwater
 feature set are unbuilt). The current backend is **Express 5 / Node**, raw SQL over
 `pg` (`$1,$2`), with Drizzle defined-but-unused. A services audit found overlap and dead
-config: Firebase configured but never referenced; Cloudinary **and** MinIO both handling
+config: Firebase configured but never referenced; two overlapping media-storage providers both handling
 media; Stream Chat **and** a custom `ws.js` both handling chat realtime; `ioredis` a
 dependency with no instantiation. Global engineering standard is Python (Django for
 data/admin, FastAPI for AI/high-throughput). Building the 20-week Stillwater feature set on
@@ -38,7 +38,7 @@ Re-platform the backend **before** the Stillwater feature migration:
 |---|---|---|
 | Firebase (dead) | **Delete** | — (no replacement; push stays Expo) |
 | Expo Push (`exp.host`) | **Keep** | Called via `httpx` from Django/Celery |
-| Cloudinary + MinIO (overlap) | **Consolidate → Cloudflare R2** *(user decision 2026-07-27; S3-compatible, zero egress fees, cheap object storage — slots into the boto3/django-storages path originally planned for MinIO)* | `django-storages` + `boto3` → R2 endpoint (`region='auto'`); **MinIO removed** (infra, code, deps); **Cloudinary removed** at R5. Transforms via Cloudflare Images if ever needed, else client-side `expo-image-manipulator` |
+| Overlapping media storage | **Consolidate → Cloudflare R2** *(user decision 2026-07-27; S3-compatible, zero egress fees, cheap object storage — boto3/django-storages path)* | `django-storages` + `boto3` → R2 endpoint (`region='auto'`); legacy media providers removed (infra, code, deps); server-side upload consolidated at R5. Transforms via Cloudflare Images if ever needed, else client-side `expo-image-manipulator` |
 | Stream Chat + custom `ws.js` (overlap) | **Consolidate → self-hosted realtime on FastAPI** (no per-MAU SaaS cost; data stays in-house; FastAPI is the realtime tier) | FastAPI WebSockets + Redis pub/sub + Postgres `chat_*` tables; drop Stream Chat *(strong recommendation)* |
 | Redis (unused) | **Keep + actually use** | Redis = WS pub/sub across workers, cache, Celery broker, rate-limit store |
 | node-cron jobs | **Replace** | Celery + Celery-beat (reminders, streak, auto-cancel, payouts) |
@@ -55,7 +55,7 @@ Re-platform the backend **before** the Stillwater feature migration:
 - **PK convention:** move new schema to **UUID PKs** (aligns with global default; non-enumerable
   IDs suit a health app). Pre-launch = no data to migrate, so this is free now. *(Diverges from the
   current `serial` PKs — deliberate.)*
-- **Ports:** every service (Django, FastAPI, Redis, Postgres, MinIO, admin-web) gets a port via the
+- **Ports:** every service (Django, FastAPI, Redis, Postgres, admin-web) gets a port via the
   **`ports` skill + `~/.claude/PORTS.md` lane** — no hardcoding. Resolves the current 3000-vs-4000 drift.
 - **Gateway:** nginx path-routes `/api/**` → Django, `/rt/**` + `/ws/**` → FastAPI.
 - **Migrations:** Django migrations governed by the `migrations` skill (zero-downtime, reversible).

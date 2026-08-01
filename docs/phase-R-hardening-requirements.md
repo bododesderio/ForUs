@@ -94,6 +94,6 @@ cutover gate) unless a change ships with a matching frontend edit.
 | **R4** 🚧 | SEC-2 ✅ (REST + WS send/join_room membership) · SEC-4 ✅ (single-use WS ticket, no URL token) · BUG-7 ✅ (persist-then-broadcast) · PERF-3..6 ✅ (Redis pub/sub multi-worker fan-out) · ARCH-5 ✅ (chat unified on FastAPI, Stream removed) · SEC-9 → Stillwater P0 (expo-secure-store) · SEC-8 → payments (Pesapal IPN) |
 | **R5** ✅ | SEC-6 (oversize rejected pre-stream; magic-byte content sniff — spoofed ext rejected; client mimetype never trusted) |
 | **R6** ✅ | BUG-5 ✅ (reminder: one notification per recipient, non-null recipient_id, no double-save) · PERF-1 (job side — scheduled, not per-request) · PERF-2 (Celery offloads push from the request path) |
-| **R7** ✅ | PERF-6 ✅ (Node deleted → getstream/cloudinary/express deps gone; gateway Python-only) |
+| **R7** ✅ | PERF-6 ✅ (Node deleted → getstream/express and legacy-media deps gone; gateway Python-only) |
 | **Stillwater** | PERF-7, ARCH-5 (auth unify, feed, a11y), SEC-9 (if not done at R4) |
 </invoke>

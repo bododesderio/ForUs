@@ -56,8 +56,8 @@ Then `npm install` and confirm `tsc` + a device run. **Do not remove the deps be
 
 ## Bundle here (optional)
 SEC-9: move `accessToken`/`refreshToken` from `AsyncStorage` to `expo-secure-store`
-(`src/services/api.js` token helpers). Also retire `src/services/cloudinaryUpload.ts` (media is R2 now
-via `uploadService.ts` → `/api/upload`).
+(`src/services/api.js` token helpers). Media uploads are on Cloudflare R2
+via `uploadService.ts` → `/api/upload`.
 
 ## Verification (definition of done)
 `tsc` clean · app builds · two devices exchange messages + typing in real time · history loads ·

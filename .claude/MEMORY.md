@@ -39,8 +39,8 @@ Created: 2026-07-27
     Django = data/admin/auth/CRUD/payments/migrations; FastAPI = realtime chat, video
     tokens, webhooks, AI/moderation. **Big-bang pre-launch rewrite**, runs BEFORE
     Stillwater feature migration. Recorded in ADR-001.
-  - Storage → **Cloudflare R2** (S3-compatible, zero egress). Removed **MinIO** (infra+code+dep)
-    and **Firebase** (was dead config). Cloudinary retired at Phase R5. Redis kept (wired in Phase R).
+  - Storage → **Cloudflare R2** (S3-compatible, zero egress). Removed legacy media providers (infra+code+dep)
+    and **Firebase** (was dead config). Redis kept (wired in Phase R).
   - Frontend stays **React Native/Expo** — unchanged.
   - Stillwater design source files (screens.jsx, user-app.jsx, …) **do not exist** in repo/git
     history → build from the migration-doc spec + existing 8-theme palette (`constants/theme.tsx`).
@@ -158,9 +158,9 @@ Created: 2026-07-27
 
 ## [2026-08-01] — Phase R5: media upload → Cloudflare R2 (Django, backend)
 - **Files:** core/media.py (sniffer + store), core/views.py UploadView, core/urls.py (+/api/upload), settings (R2_PUBLIC_URL, MAX_UPLOAD_BYTES), infra/.env(.example) MAX_UPLOAD_BYTES. Tests: core/tests/test_upload.py.
-- **Finding:** Node StorageService ALREADY used R2 (@aws-sdk/client-s3). Cloudinary survived only client-side (frontend cloudinaryUpload.ts direct-to-Cloudinary + /cloudinary-signature Node route). So R5 backend = port POST /api/upload to Django with SEC-6.
+- **Finding:** Node StorageService ALREADY used R2 (@aws-sdk/client-s3). the legacy media provider survived only client-side (a direct-upload helper + signature route). So R5 backend = port POST /api/upload to Django with SEC-6.
 - **SEC-6:** oversize rejected before streaming (Django spools >2.5MB to temp file — no multer 50MB memory buffer). Real content-type SNIFFED from magic bytes (core.media.sniff_content_type: jpeg/png/gif/webp/wav/pdf/mp4/mp3), client mimetype ignored → .exe-as-.png rejected. Random uuid key + sniffed ext (not client filename). Stream via default_storage.save(key, file_obj) (django-storages S3Storage→R2 from R0 STORAGES). URL = R2_PUBLIC_URL/key (or storage.url fallback).
-- **Parity:** {success:true, url} / 400 {success:false, message}. Frontend uploadService.ts already POSTs FormData 'file' to /api/upload → no change. cloudinaryUpload.ts removal = frontend task (R4c-2/R7).
+- **Parity:** {success:true, url} / 400 {success:false, message}. Frontend uploadService.ts already POSTs FormData 'file' to /api/upload → no change. legacy client uploader removal = frontend task (R4c-2/R7).
 - **Tests:** override_settings STORAGES=InMemoryStorage so no real R2 hit; sniff unit + valid/spoofed/no-file/oversize/auth. 84 total (73 django + 11 fastapi), ruff clean.
 - **Resume:** R6 Celery (reminders, auto-cancel schedule, all deferred push notifications via httpx→Expo, BUG-5) OR R4c-2 frontend chat UI. Then R7 cutover + delete backend/.
 
@@ -175,7 +175,7 @@ Created: 2026-07-27
 ## [2026-08-01] — Phase R7: cutover + delete Node
 - **nginx gateway** (infra/nginx/nginx.conf): fixed `location /ws/` → `location /ws` (prefix) so the exact `/ws` path the client connects to routes to FastAPI (was a 404 gap). /api→django, /rt+/ws→fastapi, /api/admin→django. Already Python-only otherwise.
 - **dev.js**: repointed from Node backend (:10005, nodemon server.js) to the Python stack behind the gateway (:10000, `docker compose up` in infra/). Writes frontend .env API_BASE_URL=http://IP:10000/api. dotenv → infra/.env.
-- **Deleted:** backend/ (Node, 48 files) + root docker-compose.yml (Node stack). Remaining top-level: docs frontend infra libs services. getstream/cloudinary/express deps gone with backend/package.json (PERF-6).
+- **Deleted:** backend/ (Node, 48 files) + root docker-compose.yml (Node stack). Remaining top-level: docs frontend infra libs services. getstream/express (and the legacy media SDK) deps gone with backend/package.json (PERF-6).
 - **README** updated: stack (Django+FastAPI), quickstart (infra compose), project layout, conventions (DRF/SimpleJWT/structlog), chat (native WS).
 - **Verified cutover:** built + `docker compose up -d --build`; all healthy. Through gateway :10000 — /api/health 200, /rt/health 200, /api/admin/login 200, /ws WS-upgrade → FastAPI 403 (no ticket = correct SEC-4), celery beat scheduling send_appointment_reminders. compose config valid. 90 tests green (79 django + 11 fastapi), ruff clean both.
 - **Phase R = COMPLETE** except R4c-2 (frontend chat SCREENS still on Stream components — needs Expo runtime to rewrite+verify). Node is gone; the parity harness's Node reference no longer exists (tests are self-contained, don't import backend/).
