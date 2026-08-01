@@ -374,7 +374,7 @@ packages/
 - `ScreenVoiceJournal` — record, on-device transcribe via Expo Speech / `expo-speech`, save to `voice_entries`
 
 **Backend**
-- `POST /api/voice-entries` — accepts audio file (multipart), stores in MinIO/S3, attaches transcript
+- `POST /api/voice-entries` — accepts audio file (multipart), stores in **Cloudflare R2** (via the Django upload path / django-storages, R5), attaches transcript
 
 ---
 

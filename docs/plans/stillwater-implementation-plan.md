@@ -369,7 +369,7 @@ flag that falls back to the flat `role` check; audit middleware is additive.
 **Blocked-by:** Phases 0, 1, 3. **Est: 5–6 person-days.** *(Optional — punt if running long.)*
 ### Screen ⟨design unresolved — B‑1⟩: `ScreenVoiceJournal` (record → on-device transcribe via
 `expo-speech` → save to `voice_entries`; reuse existing `VoiceRecorder.tsx`).
-### Backend: `POST /api/voice-entries` (multipart audio → MinIO/S3 via existing `StorageService`, attach transcript).
+### Backend: `POST /api/voice-entries` (multipart audio → **Cloudflare R2** via the Django upload path — `core.media` / django-storages, R5 — attach transcript). *(Node `StorageService` is gone.)*
 ### Acceptance: record → transcribe → row in `voice_entries` with audio URL + transcript.
 ### Risk: on-device transcription accuracy — acceptable for v1; server Whisper fallback documented.
 ### Rollback: feature-flag; endpoint additive.
