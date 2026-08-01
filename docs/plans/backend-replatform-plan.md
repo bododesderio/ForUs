@@ -110,7 +110,8 @@ Admin/consultant route stubs stay stubs (Stillwater Phase 9 fills them).
 - **Accept:** image + audio upload round-trips through R2, served via public/custom-domain URL.
   **Rollback:** keep the old route live in parallel until confirmed.
 
-## R6 · Background jobs → Celery  — Est 3–4 p-days · blocked-by: R3
+## R6 · Background jobs → Celery  — ✅ DONE (reminder+auto-cancel) 2026-08-01 · blocked-by: R3
+> appointments/tasks.py: send_appointment_reminders (15-min) + cancel_expired (both */5 crontab, compose celery worker -B). core/push.py: send_expo_push (httpx→Expo) + notify() (BUG-5 fixed: one row/recipient, non-null recipient_id). streak/payout come with Stillwater P3/P5. 6 tests.
 - Port `node-cron` jobs to Celery-beat: appointment reminder (every 5 min), auto-cancel expired,
   streak compute (Stillwater P3 will extend), payout cycle (Stillwater P5). Push via `httpx` → Expo.
 - **Accept:** reminder fires 15 min pre-appointment through Celery; auto-cancel matches Node timing.

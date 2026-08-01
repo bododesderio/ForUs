@@ -163,3 +163,11 @@ Created: 2026-07-27
 - **Parity:** {success:true, url} / 400 {success:false, message}. Frontend uploadService.ts already POSTs FormData 'file' to /api/upload → no change. cloudinaryUpload.ts removal = frontend task (R4c-2/R7).
 - **Tests:** override_settings STORAGES=InMemoryStorage so no real R2 hit; sniff unit + valid/spoofed/no-file/oversize/auth. 84 total (73 django + 11 fastapi), ruff clean.
 - **Resume:** R6 Celery (reminders, auto-cancel schedule, all deferred push notifications via httpx→Expo, BUG-5) OR R4c-2 frontend chat UI. Then R7 cutover + delete backend/.
+
+## [2026-08-01] — Phase R6: Celery jobs (reminders + auto-cancel)
+- **Files:** core/push.py (send_expo_push httpx→Expo + notify()), appointments/tasks.py, appointments/services.upcoming_appointments(), settings (CELERY_BEAT_SCHEDULE + crontab + CELERY_TIMEZONE), infra/docker-compose celery `worker -B`. Tests: appointments/tests/test_tasks.py.
+- **BUG-5 fixed:** notify(user,title,body,data) persists exactly ONE content.Notification (recipient=user, non-null) + best-effort Expo push if profile.push_token && notifications_enabled (failure swallowed, logged). Node reminderJob passed {userId,consultantId} to saveNotification (wanted {recipientId}) → null recipient_id crash every run + double-save.
+- **Tasks (shared_task, explicit name=):** appointments.tasks.send_appointment_reminders (15-min-ahead, one notify per recipient) + appointments.tasks.cancel_expired_appointments (calls services.cancel_expired_appointments). Beat: both */5 via CELERY_BEAT_SCHEDULE. Embedded beat (worker -B) — split to dedicated beat if worker scales out.
+- **notify() is the shared push helper** the R3c/R4 state-change push points (deferred to R6) can now adopt — not yet retrofitted (scope). streak/payout tasks come with Stillwater P3/P5.
+- **Tests:** upcoming window, BUG-5 (2 rows/appt one per recipient), push gating (opted-in→pushed, disabled/tokenless→skip), cancel task, invalid-token ValueError. Push monkeypatched (no network). 90 total (79 django + 11 fastapi), ruff clean. Verified tasks register + beat loads via celery loader.
+- **Resume:** R7 cutover (route all →Python, parity harness, delete backend/) OR R4c-2 chat UI. Phase R nearly done: R0-R6 ✅ (minus R4c-2 UI).

@@ -135,6 +135,20 @@ CACHES = {
 CELERY_BROKER_URL = env("CELERY_BROKER_URL", default=REDIS_URL)
 CELERY_RESULT_BACKEND = env("CELERY_RESULT_BACKEND", default=REDIS_URL)
 CELERY_TASK_ALWAYS_EAGER = env_bool("CELERY_TASK_ALWAYS_EAGER", default=False)
+CELERY_TIMEZONE = "UTC"
+
+from celery.schedules import crontab  # noqa: E402
+
+CELERY_BEAT_SCHEDULE = {
+    "appointment-reminders": {
+        "task": "appointments.tasks.send_appointment_reminders",
+        "schedule": crontab(minute="*/5"),
+    },
+    "auto-cancel-expired-appointments": {
+        "task": "appointments.tasks.cancel_expired_appointments",
+        "schedule": crontab(minute="*/5"),
+    },
+}
 
 # ─── DRF + SimpleJWT (auth ported in R2; rotation + blacklist per SEC-3) ─────────
 REST_FRAMEWORK = {

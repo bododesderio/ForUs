@@ -93,7 +93,7 @@ cutover gate) unless a change ships with a matching frontend edit.
 | **R3** ✅ | BUG-4 ✅ (events non-admin→403, true PATCH) · BUG-6 ✅ (duration 60) · ARCH-2 ✅ (one error envelope) · ARCH-3 ✅ (role checks are declarative permission classes; no dead stubs) · PERF-1 (reads use R1 indexes). Extra: appointment IDOR closed, `/users` PII admin-gated, `send-notification` admin-only |
 | **R4** 🚧 | SEC-2 ✅ (REST + WS send/join_room membership) · SEC-4 ✅ (single-use WS ticket, no URL token) · BUG-7 ✅ (persist-then-broadcast) · PERF-3..6 ✅ (Redis pub/sub multi-worker fan-out) · ARCH-5 (chat unified on FastAPI) · SEC-9 pending R4c frontend · SEC-8 → R5 (Pesapal IPN) |
 | **R5** ✅ | SEC-6 (oversize rejected pre-stream; magic-byte content sniff — spoofed ext rejected; client mimetype never trusted) |
-| **R6** | PERF-1 (job side), PERF-2, BUG-5 |
+| **R6** ✅ | BUG-5 ✅ (reminder: one notification per recipient, non-null recipient_id, no double-save) · PERF-1 (job side — scheduled, not per-request) · PERF-2 (Celery offloads push from the request path) |
 | **R7** | PERF-6 (dep removal) |
 | **Stillwater** | PERF-7, ARCH-5 (auth unify, feed, a11y), SEC-9 (if not done at R4) |
 </invoke>

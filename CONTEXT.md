@@ -6,7 +6,13 @@
 Last updated: 2026-08-01
 
 ## Current task
-**Phase R5 (media → R2) backend done. R4c-2 (chat UI) still pending. Next: R6 (Celery) / R7 (cutover).**
+**Phase R6 (Celery jobs) done. Remaining in R: R4c-2 (chat UI, needs Expo) + R7 (cutover, delete Node).**
+R6: node-cron → Celery-beat. `appointments/tasks.py` — `send_appointment_reminders` (15-min-ahead)
+and `cancel_expired_appointments` (scheduled counterpart to on-read auto-cancel), both on a `*/5`
+crontab (`CELERY_BEAT_SCHEDULE`; compose celery now runs `worker -B`). `core/push.py`: `send_expo_push`
+(httpx→Expo) + `notify()` — the corrected notification helper (BUG-5: one row per recipient,
+non-null recipient_id, no double-save; Node crashed every run). 90 tests green (79 Django + 11 FastAPI).
+`notify()` is the shared push helper the R3c/R4 state-change points can adopt (deferred push delivery).
 R5: single Django upload path `POST /api/upload` → Cloudflare R2 via django-storages. **SEC-6**:
 oversize rejected before streaming (Django spools to temp, no 50 MB in-memory buffer), real
 content-type **sniffed from magic bytes** (client mimetype never trusted — a `.exe` renamed `.png`
@@ -175,14 +181,13 @@ Celery 10003, admin-web 10004, Node(transitional) 10005, Postgres 10010, Redis 1
    from `typingUsers`. Then remove `stream-chat`/`stream-chat-expo`/`stream-chat-react-native*` from
    `package.json` and any `OverlayProvider`/Stream client wiring. Verify by running the app. (Bundle
    SEC-9: move tokens to `expo-secure-store`.)
-2. **R6 — Celery jobs.** Port node-cron → Celery-beat: appointment reminder (15-min pre), auto-cancel
-   expired (logic already in `appointments.services.cancel_expired_appointments`), streak, payout cycle.
-   Push delivery via `httpx` → Expo (all the R2–R4 "deferred to R6" push notifications). BUG-5 (typed
-   notification payload), PERF-1 (job side), PERF-2. `send-notification` becomes an internal task.
-3. **R7 — cutover + delete Node.** Gateway routes all `/api/**` to Django, `/ws` to FastAPI; parity
-   harness green; delete `backend/`. Retire frontend `cloudinaryUpload.ts` + `stream-chat-*` (R4c-2).
-4. Start **Pesapal merchant onboarding** (long pole, ~1–2 wk approval) — in parallel. Pesapal IPN
-   (SEC-8 webhook HMAC) lands with payments.
+2. **R7 — cutover + delete Node.** Gateway routes all `/api/**` to Django, `/ws` to FastAPI; run the
+   parity harness green; delete `backend/`. Retire frontend `cloudinaryUpload.ts` + `stream-chat-*`
+   (R4c-2). Remove the transitional Node port (10005) + `getstream`/`cloudinary` deps. PERF-6 (dep removal).
+3. **R4c-2 — chat UI screens** (needs Expo runtime): rewrite off Stream components onto the native
+   `useChatContext()`; remove `stream-chat-*` deps. (Bundle SEC-9 expo-secure-store.)
+4. Start **Pesapal merchant onboarding** (long pole, ~1–2 wk approval). Pesapal IPN (SEC-8 webhook
+   HMAC) + Collections/Disbursements land with payments (post-R, Stillwater P5).
 5. After Phase R lands → Stillwater 0–10 on the Python backend.
 
 ## R0 done (2026-07-31) — scaffold verified booting healthy on lane 10000

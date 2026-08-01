@@ -34,6 +34,18 @@ def cancel_expired_appointments() -> int:
     )
 
 
+def upcoming_appointments(minutes_ahead: int = 15) -> list[Appointment]:
+    """Active appointments starting within the next `minutes_ahead` minutes (reminder source)."""
+    now = timezone.now()
+    return list(
+        Appointment.objects.filter(
+            status__in=EXPIRABLE_STATUSES,
+            appointment_datetime__gt=now,
+            appointment_datetime__lte=now + timedelta(minutes=minutes_ahead),
+        )
+    )
+
+
 def consultant_exists(consultant_id) -> bool:
     """A real, non-deleted consultant with a details row (mirrors the Node INNER JOIN)."""
     return ConsultantDetails.objects.filter(

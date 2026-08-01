@@ -72,7 +72,9 @@ services:
   celery:
     image: forus/django-api:dev
     restart: always
-    command: celery -A forus worker -l info
+    # Embedded beat (-B) drives the R6 schedules. Single celery instance here; split
+    # into a dedicated `celery beat` process if the worker is ever scaled out.
+    command: celery -A forus worker -B -l info
     env_file: [.env]
     depends_on:
       django: { condition: service_started }
