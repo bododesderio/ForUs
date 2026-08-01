@@ -6,8 +6,15 @@
 Last updated: 2026-08-01
 
 ## Current task
-**🎉 PHASE R COMPLETE (R0–R7). Node backend deleted, Python stack live, Stream Chat fully removed.**
-Next: **Stillwater 0–10** on the Python backend (+ Pesapal onboarding in parallel).
+**PHASE R COMPLETE. Started Stillwater on the Python backend — P4 (community feed) backend done.**
+Stillwater plan is Node/Drizzle-oriented and needs reconciliation: **P1 schema was absorbed by R1**,
+**P0 test-harness by Phase R** (98 tests). P4 community feed API built on the existing R1
+`community_*` models: `/api/community/posts` (feed + create), post detail/delete, like/unlike,
+comments (list/create/delete) — pseudonymous via `username`, soft-delete, owner/admin gating. 8 tests.
+**Follow-ups noted:** groups + typed reactions (support/same/hugs) need new schema; feed UI (B-1 design
+blocker); pseudonymous-handle generation on signup. Next verifiable backend slices: deferred push
+wiring, forgot-password/email (P2 backend, needs Resend stub). External-dep phases (payments/video)
+gated on Pesapal/Agora.
 R4c-2 (last piece) rewrote all chat UI off Stream onto the native `ChatContext`: shared
 `ChatRoomList`, native `ChatRoomScreen` (join + history, send, typing, read receipts), 3 chat tabs
 → thin wrappers, deleted 2 orphaned Stream components, removed `stream-chat*` (51 pkgs pruned).

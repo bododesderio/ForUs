@@ -4,6 +4,8 @@
 -->
 # ForUs — Stillwater Implementation Plan (Phases 0–10)
 
+> **⚠ RECONCILIATION (2026-08-01):** written against the Node/Drizzle backend, which is **deleted** (Phase R). Backend is now **Django (`services/django-api`) + FastAPI (`services/fastapi-rt`)**. Absorbed by Phase R: **P1 schema → R1** (Django models/migrations), **P0 test harness → Phase R** (98 tests). Backend routes below map to DRF/FastAPI, not Express. **P4 community-feed backend: ✅ DONE** (`/api/community/*`).
+
 **Source of record:** `docs/STILLWATER_MIGRATION.md`
 **Planned:** 2026-07-27 · **Status:** DRAFT for review — no code written, nothing committed.
 **Executor:** run `/do` per phase after approval. Re-plan phases 6–10 as earlier phases land.
@@ -222,7 +224,8 @@ writes all three to `moods`), `ScreenLibrary` (replaces `ResourceViewer`/`Articl
 
 ---
 
-# Phase 4 · Community / peer feed
+# Phase 4 · Community / peer feed  — 🚧 backend ✅ DONE 2026-08-01 (Django)
+> Built on R1 `community_*` models: /api/community/posts (feed+create), post detail/delete, like/unlike, comments. Pseudonymous via username; owner/admin gating; soft-delete. 8 tests. TODO: groups + typed reactions (new schema), feed UI (B-1), handle-gen on signup.
 **Blocked-by:** Phases 0, 1, 3. **Est: 5–6 person-days.**
 
 ### Activate dormant `community_posts/likes/comments` tables (currently no API; frontend uses

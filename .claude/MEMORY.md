@@ -188,3 +188,12 @@ Created: 2026-07-27
 - **Verified:** no stream-chat imports in src; tsc 0 errors in all chat files; project total unchanged (1 pre-existing). Reverted an out-of-scope event-data.ts fix to keep R4c-2 diff focused.
 - **NOT runtime-verified** (no simulator). v1 defers reactions/threads/attachment-preview/audio/rich-user-search (Stream-only). Handoff/parity notes in docs/R4c-2-chat-ui-handoff.md.
 - **PHASE R COMPLETE (R0–R7).** Next: device runtime-verify chat + SEC-9 (secure-store) + Stillwater 0–10 on Python backend. Node gone.
+
+## [2026-08-01] — Stillwater P4 (community feed) BACKEND on Python
+- **Context:** Phase R done → started Stillwater on Django/FastAPI. Stillwater plan is Node-oriented; P1 schema absorbed by R1, P0 test-harness by Phase R. Reconciliation banner added to docs/plans/stillwater-implementation-plan.md.
+- **Built:** community/{services,serializers,views,urls}.py + tests/test_community.py on the R1 community_* models (were schema-only/ARCH-4). Mounted /api/community/.
+  - GET/POST /api/community/posts (paginated feed w/ like_count+comment_count+liked via annotate/Count; create). GET/DELETE /posts/<id> (detail; soft-delete owner/admin). POST/DELETE /posts/<id>/like (idempotent get_or_create / filter-delete). GET/POST /posts/<id>/comments. DELETE /comments/<id> (owner/admin).
+  - Greenfield (no Node parity — community was never wired). Envelope {success, posts/post/comments, pagination}. Pseudonymous: author = {id, username, profile_image} — username handle, NEVER real name. Content length caps (5000/2000) as moderation stand-in (P7).
+- **Follow-ups (need schema/UI/runtime):** groups (GET /groups, join) + typed reactions (support|same|hugs) need new tables; feed UI (B-1 design blocker); @adjective_noun_NN handle generation on signup (accounts.register).
+- **Verified:** 8 community tests (create/feed/pseudonymity, like idempotency+unlike, liked flag per-caller, comments+counts, owner/admin delete, soft-delete→404, auth). Full: 98 tests (87 django + 11 fastapi), ruff clean.
+- **Next verifiable backend:** deferred push wiring (notify() into appointment/chat state changes); P2 forgot-password + email (Resend stub) + email_verified. External-dep phases (P5 payments/Pesapal, P6 video/Agora) gated on onboarding.

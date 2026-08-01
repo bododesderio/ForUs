@@ -12,6 +12,7 @@ urlpatterns = [
     path("api/mood", include("wellness.urls")),
     path("api/appointments/", include("appointments.urls")),
     path("api/chat/", include("chat.urls")),
+    path("api/community/", include("community.urls")),
     path("api/", include("content.urls")),  # events + resources
     path("api/", include("core.urls")),
 ]
