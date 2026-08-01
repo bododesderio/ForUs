@@ -45,6 +45,17 @@ from .tokens import tokens_for_user
 EMAIL_VERIFY_SALT = "forus:email-verify"
 
 
+def send_verification_email(user) -> None:
+    """Email a signed 24h email-verification link (best-effort; no-op without a provider)."""
+    token = TimestampSigner(salt=EMAIL_VERIFY_SALT).sign(str(user.id))
+    link = f"{settings.FRONTEND_URL}/verify-email?token={token}"
+    send_email(
+        user.email,
+        "Verify your ForUs email",
+        f'<p>Welcome to ForUs! Confirm your email:</p><p><a href="{link}">Verify email</a></p>',
+    )
+
+
 class RegisterUserView(APIView):
     permission_classes = [AllowAny]
 
@@ -57,6 +68,7 @@ class RegisterUserView(APIView):
             username=ser.validated_data["username"],
             profile_image=ser.validated_data.get("profile_image"),
         )
+        send_verification_email(user)
         return Response(
             {"success": True, "message": "User Registered Successfully.", "user": build_user_payload(user)},
             status=status.HTTP_201_CREATED,
@@ -76,6 +88,7 @@ class RegisterConsultantView(APIView):
             first_name=ser.validated_data.get("first_name"),
             last_name=ser.validated_data.get("last_name"),
         )
+        send_verification_email(user)
         # Status 200 mirrors the Node consultant endpoint (user register returns 201).
         return Response(
             {"success": True, "message": "Consultant Registered Successfully.", "user": build_user_payload(user)},
@@ -276,13 +289,7 @@ class RequestEmailVerificationView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request: Request) -> Response:
-        token = TimestampSigner(salt=EMAIL_VERIFY_SALT).sign(str(request.user.id))
-        link = f"{settings.FRONTEND_URL}/verify-email?token={token}"
-        send_email(
-            request.user.email,
-            "Verify your ForUs email",
-            f'<p>Confirm your email:</p><p><a href="{link}">Verify email</a></p>',
-        )
+        send_verification_email(request.user)
         return Response({"success": True, "message": "Verification email sent."}, status=status.HTTP_200_OK)
 
 

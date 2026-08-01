@@ -94,3 +94,13 @@ def test_verify_email_confirm_sets_flag():
 def test_verify_email_confirm_rejects_bad_token():
     resp = APIClient().post("/api/auth/verify-email/confirm", {"token": "garbage"}, format="json")
     assert resp.status_code == 400
+
+
+def test_register_sends_verification_email(_stub_email):
+    resp = APIClient().post(
+        "/api/auth/register-user",
+        {"username": "ann", "email": "ann@forus.app", "password": STRONG},
+        format="json",
+    )
+    assert resp.status_code == 201
+    assert any(to == "ann@forus.app" for to, _ in _stub_email)
