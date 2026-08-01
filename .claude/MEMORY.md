@@ -155,3 +155,11 @@ Created: 2026-07-27
 - **CANNOT run Expo/RN here** — .tsx screen rewrite + `stream-chat-*` dep removal deferred (removing deps before screens migrate would break the build). node --check passed on ChatContext.js.
 - **R4c-2 files to migrate:** ChatRoomScreen.tsx, ChatComponent.tsx, CustomMessage.tsx, (users|consultants|tabs)/chat.tsx, _layout.tsx. Deps to remove: stream-chat-expo, stream-chat-react-native, stream-chat-react-native-core (package.json:65-67). Bundle SEC-9 (expo-secure-store for tokens).
 - **Resume:** R4c-2 (with app runnable) or R5 (media→R2). Backend chat is complete + tested.
+
+## [2026-08-01] — Phase R5: media upload → Cloudflare R2 (Django, backend)
+- **Files:** core/media.py (sniffer + store), core/views.py UploadView, core/urls.py (+/api/upload), settings (R2_PUBLIC_URL, MAX_UPLOAD_BYTES), infra/.env(.example) MAX_UPLOAD_BYTES. Tests: core/tests/test_upload.py.
+- **Finding:** Node StorageService ALREADY used R2 (@aws-sdk/client-s3). Cloudinary survived only client-side (frontend cloudinaryUpload.ts direct-to-Cloudinary + /cloudinary-signature Node route). So R5 backend = port POST /api/upload to Django with SEC-6.
+- **SEC-6:** oversize rejected before streaming (Django spools >2.5MB to temp file — no multer 50MB memory buffer). Real content-type SNIFFED from magic bytes (core.media.sniff_content_type: jpeg/png/gif/webp/wav/pdf/mp4/mp3), client mimetype ignored → .exe-as-.png rejected. Random uuid key + sniffed ext (not client filename). Stream via default_storage.save(key, file_obj) (django-storages S3Storage→R2 from R0 STORAGES). URL = R2_PUBLIC_URL/key (or storage.url fallback).
+- **Parity:** {success:true, url} / 400 {success:false, message}. Frontend uploadService.ts already POSTs FormData 'file' to /api/upload → no change. cloudinaryUpload.ts removal = frontend task (R4c-2/R7).
+- **Tests:** override_settings STORAGES=InMemoryStorage so no real R2 hit; sniff unit + valid/spoofed/no-file/oversize/auth. 84 total (73 django + 11 fastapi), ruff clean.
+- **Resume:** R6 Celery (reminders, auto-cancel schedule, all deferred push notifications via httpx→Expo, BUG-5) OR R4c-2 frontend chat UI. Then R7 cutover + delete backend/.

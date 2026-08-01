@@ -98,7 +98,8 @@ Admin/consultant route stubs stay stubs (Stillwater Phase 9 fills them).
 - **Accept:** two clients exchange messages + typing + reactions in real time across two FastAPI
   workers; history loads from Postgres. **Rollback:** point WS back to `ws.js`; keep Stream deps until R7.
 
-## R5 · Media consolidation → Cloudflare R2  — Est 3–4 p-days · blocked-by: R1
+## R5 · Media consolidation → Cloudflare R2  — ✅ DONE (backend) 2026-08-01 · blocked-by: R1
+> Django POST /api/upload → R2 (django-storages). SEC-6: size cap before stream, magic-byte content sniff (client mimetype untrusted), random key, {success,url} parity. Cloudinary gone server-side; frontend cloudinaryUpload.ts retire = R4c-2/R7. 6 tests.
 - `django-storages` + `boto3` → R2 (S3-compatible endpoint, `region='auto'`). Port `/api/upload`
   (multer) **and** the residual client-direct `/cloudinary-signature` route to a single Django upload
   path — either server-side put returning a public/custom-domain R2 URL, or a **presigned R2 PUT**.

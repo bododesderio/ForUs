@@ -178,6 +178,12 @@ STORAGES = {
     "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"},
 }
 
+# Public base for served objects (R2 custom domain or pub-*.r2.dev). Uploads return
+# `${R2_PUBLIC_URL}/${key}`; unset (dev) falls back to the storage backend's URL.
+R2_PUBLIC_URL = env("R2_PUBLIC_URL", default="")
+# Hard cap enforced before an upload is streamed to storage (SEC-6).
+MAX_UPLOAD_BYTES = int(env("MAX_UPLOAD_BYTES", default=str(50 * 1024 * 1024)))
+
 # ─── i18n / static ──────────────────────────────────────────────────────────────
 LANGUAGE_CODE = "en-us"
 TIME_ZONE = "UTC"
