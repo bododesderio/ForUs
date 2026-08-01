@@ -17,9 +17,32 @@ from rest_framework.views import exception_handler as drf_exception_handler
 logger = logging.getLogger(__name__)
 
 
+def _summarize(data: object) -> str:
+    """Pick a human-facing `message` out of a DRF error body (frontend reads `.message`)."""
+    if isinstance(data, dict):
+        if "detail" in data:
+            return str(data["detail"])
+        for value in data.values():  # first field error
+            if isinstance(value, (list, tuple)) and value:
+                return str(value[0])
+            if isinstance(value, str):
+                return value
+    if isinstance(data, (list, tuple)) and data:
+        return str(data[0])
+    return "Request failed"
+
+
 def exception_handler(exc: Exception, context: dict) -> Response:
     response = drf_exception_handler(exc, context)
     if response is not None:
+        # Normalize every DRF error into the one envelope (ARCH-2): success + message,
+        # with the original field errors preserved under `errors` for clients that want them.
+        detail = response.data
+        response.data = {
+            "success": False,
+            "message": _summarize(detail),
+            "errors": detail,
+        }
         return response
 
     # Non-DRF exception → log with detail, return a generic body.

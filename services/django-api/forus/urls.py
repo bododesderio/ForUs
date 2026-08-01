@@ -6,5 +6,6 @@ from django.urls import include, path
 
 urlpatterns = [
     path("api/admin/", admin.site.urls),  # admin relocated off /admin/ (traefik-routing convention)
+    path("api/auth/", include("accounts.urls")),
     path("api/", include("core.urls")),
 ]

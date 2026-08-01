@@ -69,7 +69,7 @@ infra/ (docker-compose, nginx)     frontend/ (unchanged Expo app)
 - **Accept:** `migrate` applies + reverses on scratch DB; Django Admin lists all models; FastAPI can
   read a row via Core. **Rollback:** drop the Python DB; Node keeps its own schema.
 
-## R2 · Auth (DRF SimpleJWT)  — Est 4–5 p-days · blocked-by: R1
+## R2 · Auth (DRF SimpleJWT)  — ✅ DONE 2026-08-01 · blocked-by: R1
 - Port: register-user, register-consultant, login, refresh, logout, change-password, push-token save.
 - Access 15m / refresh 7d; blacklist on logout. bcrypt hashes are compatible — **verify Django can read
   existing `bcryptjs` hashes** (both bcrypt; set Django `BCryptPasswordHasher`). Activity logging →

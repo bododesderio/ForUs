@@ -1,3 +1,7 @@
+/**
+ * @author Bodo Desderio <rooiboktechltd@gmail.com>
+ * @copyright 2026 Rooibok Technologies. All rights reserved.
+ */
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {API_BASE_URL as api_url} from '@env';
@@ -88,6 +92,11 @@ apiClient.interceptors.response.use(
         const res = await axios.post(`${API_BASE_URL}/auth/refresh-token`, { refreshToken });
         if (res.data && res.data.accessToken) {
           await setAccessToken(res.data.accessToken);
+          // Rotating refresh tokens (SEC-3): persist the new one so the next refresh
+          // uses it — the old token is now blacklisted. Absent on backends that don't rotate.
+          if (res.data.refreshToken) {
+            await setRefreshToken(res.data.refreshToken);
+          }
           apiClient.defaults.headers['Authorization'] = 'Bearer ' + res.data.accessToken;
           processQueue(null, res.data.accessToken);
           originalRequest.headers['Authorization'] = 'Bearer ' + res.data.accessToken;

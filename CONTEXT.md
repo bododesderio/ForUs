@@ -6,15 +6,15 @@
 Last updated: 2026-08-01
 
 ## Current task
-**Phase R1 COMPLETE & verified — next up R2 (auth: DRF SimpleJWT).** Express/Node →
+**Phase R2 COMPLETE & verified — next up R3 (core CRUD domains).** Express/Node →
 Django (DRF, core/CRUD/admin/payments) + FastAPI (realtime chat, video tokens,
 webhooks, AI/moderation), Postgres kept, big-bang pre-launch rewrite. Runs
 **before** the Stillwater feature migration. See `.claude/adrs/ADR-001-backend-replatform.md`
 + `docs/plans/backend-replatform-plan.md`.
-R1 ported the 18-table source schema to **19 Django models** across 6 domain apps
-(UUID PKs, soft-delete managers, TextChoices, FK cascades); reversible initial
-migrations verified up+down; Django Admin lists all 19; FastAPI reads via SQLAlchemy
-Core reflection (`libs/db/tables.py`). Resolves ARCH-1, ARCH-4, BUG-6. Node backend untouched.
+R2 ported the `/api/auth/*` surface to DRF SimpleJWT: register-user (201),
+register-consultant (200), login-user, refresh-token (rotation+blacklist),
+logout, change-password, push-token — response envelopes match Node for cutover
+parity. Resolves SEC-1, SEC-3, SEC-7, BUG-2, BUG-3, ARCH-2. 14 auth tests green.
 
 ## What it is
 **ForUs** — a mobile-first mental wellness platform: therapist consultations,
@@ -58,7 +58,22 @@ Celery 10003, admin-web 10004, Node(transitional) 10005, Postgres 10010, Redis 1
 - Goals, streaks, voice journal, session notes, earnings, audit log, billing
   dashboard, cohort analytics — none (Phases 3, 8, 9, 10)
 
-## Recent decisions (2026-08-01)
+## Recent decisions (2026-08-01, R2)
+- **Phase R2 executed & verified.** `/api/auth/*` on DRF SimpleJWT. Envelope parity with Node:
+  `{success, message, user, accessToken, refreshToken}` (camelCase token keys); login 200,
+  register-user **201**, register-consultant **200** (Node quirks preserved); login failures 400.
+- **SEC-3 rotation:** refresh returns a NEW refresh token + blacklists the old (reuse → 403).
+  Required one **additive** frontend edit (`api.js` refresh interceptor persists the rotated token;
+  safe for Node too, which never sends one). `token_blacklist` app carries it.
+- **SEC-1:** `push-token` is auth-gated, owner = `request.user` (never body). `send-notification`
+  NOT exposed (was unauthenticated) — becomes an internal Celery task in R6.
+- **Hasher fixed:** `BCryptPasswordHasher` (not BCryptSHA256) so bcryptjs `$2b$` hashes verify;
+  a future Node→Python user copy prefixes bare hashes with `bcrypt$`.
+- **ARCH-2:** exception handler normalizes every DRF error into `{success, message, errors}`
+  (frontend reads `.message`). Register is transactional; services raise, never return sentinels.
+- **Deferred:** login brute-force throttling not added (no finding mandates it) — candidate hardening.
+
+## Recent decisions (2026-08-01, R1)
 - **Phase R1 executed & verified.** 6 domain apps: `accounts`, `appointments`, `wellness`,
   `content`, `chat`, `community`. **19 models** = 20 source tables − `refresh_tokens`
   (→ SimpleJWT `token_blacklist`). All PKs UUID (incl. `chat_rooms`/`chat_messages`, formerly
@@ -91,13 +106,13 @@ Celery 10003, admin-web 10004, Node(transitional) 10005, Postgres 10010, Redis 1
 - **Current (Node, transitional):** raw SQL `$1,$2`; services throw, controllers catch.
 - Ports: never hardcode — derive from lane 10000 (`ports` skill + `~/.claude/PORTS.md`).
 
-## Next steps (START R2 — auth)
-1. **R2 — auth (DRF SimpleJWT).** Port register-user/consultant, login, refresh, logout,
-   change-password, push-token save. Access 15m / refresh 7d; blacklist on logout
-   (`token_blacklist` app already wired). Activity logging → Django signal into `accounts.Activity`.
-   ⚠ **Hasher fix required:** settings lists `BCryptSHA256PasswordHasher` first, which does NOT
-   read plain `bcryptjs` hashes — swap to `BCryptPasswordHasher` so Node hashes verify. `bcrypt`
-   is now a dependency (added in R1). Acceptance: parity harness green for `/api/auth/*`.
+## Next steps (START R3 — core CRUD domains)
+1. **R3 — core CRUD (DRF viewsets/serializers), preserving paths/shapes.** Port
+   `/api/users` · `/api/appointments` (conflict detection, auto-cancel, confirm/reject/reschedule/
+   cancel, reviews, start-session) · `/api/events` · `/api/mood` · `/api/resources` · `/api/activities`.
+   Fixes BUG-4 (non-admin mutate → 403; invalid body → 400), ARCH-2 (continue), ARCH-3, PERF-1 (reads).
+   The frontend's `/users/push-token` + `/users/consultant/push-token` land here (auth push-token
+   already done in R2). Reuse `build_user_payload` and the `record_activity` helper.
 2. Start **Pesapal merchant onboarding** (long pole, ~1–2 wk approval) — in parallel.
 3. After Phase R lands → Stillwater 0–10 on the Python backend.
 

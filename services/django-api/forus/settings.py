@@ -108,9 +108,12 @@ DATABASES = {
     }
 }
 
-# bcryptjs hashes from the Node backend are bcrypt — Django reads them with this hasher first (R2).
+# bcryptjs hashes from the Node backend are plain bcrypt ($2a/$2b). BCryptPasswordHasher
+# (NOT BCryptSHA256, which pre-hashes with SHA256 and cannot read them) verifies those, so
+# new passwords are stored bcrypt too. A future Node→Python user copy prefixes each bare
+# `$2b$…` hash with `bcrypt$` (Django's algorithm marker) so `check_password` recognizes it.
 PASSWORD_HASHERS = [
-    "django.contrib.auth.hashers.BCryptSHA256PasswordHasher",
+    "django.contrib.auth.hashers.BCryptPasswordHasher",
     "django.contrib.auth.hashers.PBKDF2PasswordHasher",
     "django.contrib.auth.hashers.Argon2PasswordHasher",
 ]

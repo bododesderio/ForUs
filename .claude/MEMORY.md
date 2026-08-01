@@ -75,3 +75,19 @@ Created: 2026-07-27
   - ⚠ R2: settings lists `BCryptSHA256PasswordHasher` first — does NOT read plain `bcryptjs` hashes. Swap to `BCryptPasswordHasher` in R2.
 - **Verified:** migrate up+down+up on scratch DB (compose pg, host 10010); Admin lists all 19; Core reads a UUID user row; ruff+pytest green both services; fastapi image builds with libs.
 - **Resume:** R2 (DRF SimpleJWT auth) + Pesapal onboarding. See CONTEXT.md "Next steps".
+
+## [2026-08-01] — Phase R2 complete: /api/auth/* on DRF SimpleJWT
+- **Decisions:**
+  - Envelope parity with Node: {success, message, user, accessToken, refreshToken}. login 200, register-user 201, register-consultant 200 (quirks kept). Login failures 400 with exact messages ("User does not exist." / "Invalid credentials." / "Account is deactivated.").
+  - SEC-3: refresh rotates (returns NEW refreshToken) + blacklists old (reuse → 403). Needed ONE additive frontend edit: api.js refresh interceptor persists res.data.refreshToken if present (safe for Node, which never sends one).
+  - SEC-1: /auth/push-token auth-gated, owner=request.user (no authId in body). /auth/send-notification NOT exposed (was unauth) → becomes Celery task in R6.
+  - Hasher: BCryptPasswordHasher (NOT BCryptSHA256 — that pre-hashes SHA256 and can't read bcryptjs). Bare Node $2b$ hashes need `bcrypt$` prefix at data-copy time.
+  - ARCH-2: core/exceptions.py normalizes ALL DRF errors → {success, message, errors}; frontend reads .message. register_user/register_consultant transactional in accounts/services.py; services raise, never {success:false}.
+  - JWT access+refresh carry email+role claims (accounts/tokens.py) for FastAPI to authorize in R4.
+- **Files:** accounts/{serializers,views,urls,services,tokens}.py + tests/test_auth.py; forus/urls.py (+/api/auth/); settings PASSWORD_HASHERS; core/exceptions.py; frontend/src/services/api.js (refresh rotation).
+- **Gotchas:**
+  - Profile.user is FK not OneToOne (R1 parity) → access via Profile.objects.filter(user=...).first(), not user.profile.
+  - DRF default perm = IsAuthenticated → register/login/refresh/logout need explicit AllowAny.
+  - RefreshToken(str) construction already raises on a blacklisted token (BlacklistMixin.verify) → that IS the reuse check; then .blacklist() to rotate.
+- **Verified:** 16 django tests green (2 health + 14 auth), ruff clean. Postgres 10010.
+- **Deferred:** login throttling (no finding). **Resume:** R3 (core CRUD: users/appointments/events/mood/resources/activities) + Pesapal onboarding.
