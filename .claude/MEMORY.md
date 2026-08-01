@@ -205,3 +205,11 @@ Created: 2026-07-27
 - **Gotcha:** don't put a module-level constant (EMAIL_VERIFY_SALT) between import groups → E402 breaks subsequent imports. Put constants after ALL imports.
 - **Verified:** 109 tests (98 django + 11 fastapi), ruff clean.
 - **Next:** register could auto-send verification email + assign pseudonymous handle (P4). External: P5 payments (Pesapal), P6 video (Agora). SEC-9 secure-store (frontend, device).
+
+## [2026-08-01] — Stillwater P3 backend: stats, rich check-in, search, streaks
+- **Schema (reversible migration, additive columns — safe non-locking):** moods += mood_color(varchar), feeling_tags(jsonb default list), note(text); profiles += streak_days(int default 0). accounts/migrations/0002, wellness/migrations/0002. Verified up+down+reapply, makemigrations --check clean.
+- **Endpoints:** POST /api/mood now saves color/tags/note (backward-compat). GET /api/profile/stats (wellness.ProfileStatsView) → {streak_days (compute_streak: consecutive days ending today-or-yesterday), total_sessions + total_practice_minutes (completed appts as user), mood_trend_30d}. GET /api/search (content.SearchView) → federated resources (title/category/author icontains) + consultants (name/profession/email icontains). Mounted at /api/profile/stats + /api/search in forus/urls.
+- **Celery:** wellness.tasks.recompute_streaks (daily crontab hour=0 min=30) caches profiles.streak_days for users who checked in in last day. compute_streak lives in wellness/views.py (imported by task).
+- **Verified:** 5 P3 tests (rich check-in, stats streak/sessions/minutes/trend, streak task, auth, search federation). Full: 115 tests (104 django + 11 fastapi), ruff clean.
+- **NOTE:** running django container is pre-P3 (old image) — new endpoints need a rebuild to serve live; tests are authoritative. Screens (ScreenHome/CheckIn/Library/Player/Profile stats) are B-1 design-blocked + need Expo runtime.
+- **Next:** P7 crisis/moderation (new schema) or P8-10, or external P5/P6. Frontend needs device.

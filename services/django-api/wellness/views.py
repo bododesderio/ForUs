@@ -8,6 +8,10 @@ POST /api/mood {date, mood}    → {"success": true} (upsert per (user, date))
 """
 from __future__ import annotations
 
+from datetime import timedelta
+
+from django.db.models import Sum
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
@@ -16,6 +20,18 @@ from rest_framework.views import APIView
 
 from .models import Mood
 from .serializers import MoodSetSerializer
+
+
+def compute_streak(user, today=None) -> int:
+    """Consecutive check-in days ending today (or yesterday, if today isn't logged yet)."""
+    today = today or timezone.now().date()
+    dates = set(Mood.objects.filter(user=user).values_list("mood_date", flat=True))
+    day = today if today in dates else today - timedelta(days=1)
+    streak = 0
+    while day in dates:
+        streak += 1
+        day -= timedelta(days=1)
+    return streak
 
 
 class MoodView(APIView):
@@ -40,9 +56,42 @@ class MoodView(APIView):
                 {"message": "Date and mood (number) are required"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+        data = ser.validated_data
         Mood.objects.update_or_create(
             user=request.user,
-            mood_date=ser.validated_data["date"],
-            defaults={"mood": ser.validated_data["mood"]},
+            mood_date=data["date"],
+            defaults={
+                "mood": data["mood"],
+                "mood_color": data.get("mood_color"),
+                "feeling_tags": data.get("feeling_tags") or [],
+                "note": data.get("note"),
+            },
         )
         return Response({"success": True}, status=status.HTTP_200_OK)
+
+
+class ProfileStatsView(APIView):
+    """GET /api/profile/stats → streak, sessions, practice minutes, 30-day mood trend (P3)."""
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request: Request) -> Response:
+        from appointments.models import Appointment, AppointmentStatus
+
+        user = request.user
+        today = timezone.now().date()
+        completed = Appointment.objects.filter(user=user, status=AppointmentStatus.COMPLETED)
+        trend = [
+            {"date": m.mood_date.isoformat(), "mood": m.mood}
+            for m in Mood.objects.filter(user=user, mood_date__gte=today - timedelta(days=29)).order_by("mood_date")
+        ]
+        return Response(
+            {
+                "success": True,
+                "streak_days": compute_streak(user, today),
+                "total_sessions": completed.count(),
+                "total_practice_minutes": completed.aggregate(s=Sum("duration_minutes"))["s"] or 0,
+                "mood_trend_30d": trend,
+            },
+            status=status.HTTP_200_OK,
+        )

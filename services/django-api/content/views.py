@@ -10,13 +10,16 @@ from __future__ import annotations
 
 import math
 
+from django.db.models import Q
 from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from accounts.models import Role, User
 from accounts.services import record_activity
+from accounts.user_services import consultant_detail_payload
 from core.permissions import IsAdminRole
 
 from .models import Event, Resource
@@ -175,5 +178,38 @@ class ResourceListView(APIView):
         qs = qs.order_by("-created_at")
         return Response(
             {"success": True, "resources": ResourceSerializer(qs, many=True).data},
+            status=status.HTTP_200_OK,
+        )
+
+
+class SearchView(APIView):
+    """GET /api/search?q= → federated results across resources + consultants (P3)."""
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request: Request) -> Response:
+        q = (request.query_params.get("q") or "").strip()
+        if not q:
+            return Response({"success": True, "resources": [], "consultants": []}, status=status.HTTP_200_OK)
+
+        resources = Resource.objects.filter(
+            Q(title__icontains=q) | Q(category__icontains=q) | Q(author__icontains=q)
+        ).order_by("-created_at")[:20]
+        consultants = (
+            User.objects.filter(role=Role.CONSULTANT, deleted_at__isnull=True)
+            .filter(
+                Q(profile__first_name__icontains=q)
+                | Q(profile__last_name__icontains=q)
+                | Q(consultant_detail__profession__icontains=q)
+                | Q(email__icontains=q)
+            )
+            .distinct()[:20]
+        )
+        return Response(
+            {
+                "success": True,
+                "resources": ResourceSerializer(resources, many=True).data,
+                "consultants": [consultant_detail_payload(u) for u in consultants],
+            },
             status=status.HTTP_200_OK,
         )

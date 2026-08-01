@@ -17,6 +17,10 @@ class Mood(UUIDModel, TimeStampedModel):
     )
     mood_date = models.DateField()
     mood = models.IntegerField()
+    # Rich check-in (Stillwater P3): a colour swatch, free-form feeling tags, and a note.
+    mood_color = models.CharField(max_length=20, null=True, blank=True)
+    feeling_tags = models.JSONField(default=list)
+    note = models.TextField(null=True, blank=True)
 
     class Meta:
         db_table = "moods"

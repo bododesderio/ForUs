@@ -118,6 +118,7 @@ class Profile(UUIDModel):
     profile_image = models.CharField(max_length=500, null=True, blank=True)
     push_token = models.CharField(max_length=255, null=True, blank=True)
     notifications_enabled = models.BooleanField(default=True, null=True)
+    streak_days = models.IntegerField(default=0)  # cached mood-check-in streak (P3)
 
     class Meta:
         db_table = "profiles"

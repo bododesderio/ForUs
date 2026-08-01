@@ -148,6 +148,10 @@ CELERY_BEAT_SCHEDULE = {
         "task": "appointments.tasks.cancel_expired_appointments",
         "schedule": crontab(minute="*/5"),
     },
+    "recompute-streaks": {
+        "task": "wellness.tasks.recompute_streaks",
+        "schedule": crontab(hour=0, minute=30),  # daily, just after midnight UTC
+    },
 }
 
 # ─── DRF + SimpleJWT (auth ported in R2; rotation + blacklist per SEC-3) ─────────

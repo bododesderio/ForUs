@@ -203,6 +203,7 @@ new `onboardingRoutes/Controller/Services`, `EmailService.js` (implement), `remi
 ---
 
 # Phase 3 · User app core (10+ screens) + stats
+> **backend ✅ DONE 2026-08-01 (Django):** schema (moods +mood_color/feeling_tags/note, profiles +streak_days; reversible migration) · rich check-in (POST /api/mood) · GET /api/profile/stats {streak_days,total_sessions,total_practice_minutes,mood_trend_30d} · GET /api/search?q= (resources+consultants) · daily recompute_streaks Celery task. 5 tests. Screens are B-1 design-blocked / need runtime.
 **Blocked-by:** Phases 0, 1 (2 recommended). **Est: 10–12 person-days.**
 
 ### Screens ⟨design unresolved — B‑1⟩ (replace, don't delete — keep old routes during transition)
