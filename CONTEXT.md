@@ -6,15 +6,17 @@
 Last updated: 2026-08-01
 
 ## Current task
-**PHASE R COMPLETE. Started Stillwater on the Python backend — P4 (community feed) backend done.**
-Stillwater plan is Node/Drizzle-oriented and needs reconciliation: **P1 schema was absorbed by R1**,
-**P0 test-harness by Phase R** (98 tests). P4 community feed API built on the existing R1
-`community_*` models: `/api/community/posts` (feed + create), post detail/delete, like/unlike,
-comments (list/create/delete) — pseudonymous via `username`, soft-delete, owner/admin gating. 8 tests.
-**Follow-ups noted:** groups + typed reactions (support/same/hugs) need new schema; feed UI (B-1 design
-blocker); pseudonymous-handle generation on signup. Next verifiable backend slices: deferred push
-wiring, forgot-password/email (P2 backend, needs Resend stub). External-dep phases (payments/video)
-gated on Pesapal/Agora.
+**PHASE R COMPLETE + Stillwater backend slices done (P2, P4, notifications). 110 tests green.**
+On the Python backend, beyond Phase R: **P4 community feed** (`/api/community/*` on R1 models —
+feed/post/like/comment, pseudonymous, soft-delete), **P2 forgot-password + email verification**
+(`/api/auth/forgot-password`,`/reset-password`,`/verify-email/*`; Resend via `core/email.py`;
+verification email on register), and **appointment→notification wiring** (notify() on
+create/confirm/cancel/start-session/review).
+**Reconciliation:** Stillwater plan was Node-oriented — P1 schema absorbed by R1, P0 harness by Phase R.
+**Boundary reached — remaining work needs one of:** (a) external creds/onboarding — **P5 payments/Pesapal**
+(1–2wk approval), **P6 video/Agora**; (b) new schema + design — **P3** goals/streaks/journal, **P7**
+crisis/moderation, **P8–P10**; (c) **Expo runtime/device** — feed UI, chat runtime verify, SEC-9 secure-store,
+pseudonymous-handle-gen. All "verifiable-now, no-external-dep, existing-schema" backend slices are done.
 R4c-2 (last piece) rewrote all chat UI off Stream onto the native `ChatContext`: shared
 `ChatRoomList`, native `ChatRoomScreen` (join + history, send, typing, read receipts), 3 chat tabs
 → thin wrappers, deleted 2 orphaned Stream components, removed `stream-chat*` (51 pkgs pruned).
