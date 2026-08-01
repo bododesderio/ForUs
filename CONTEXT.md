@@ -183,8 +183,10 @@ Celery 10003, admin-web 10004, Node(transitional) 10005, Postgres 10010, Redis 1
 2. **R7 — cutover + delete Node.** Gateway routes all `/api/**` to Django, `/ws` to FastAPI; run the
    parity harness green; delete `backend/`. Retire frontend `cloudinaryUpload.ts` + `stream-chat-*`
    (R4c-2). Remove the transitional Node port (10005) + `getstream`/`cloudinary` deps. PERF-6 (dep removal).
-3. **R4c-2 — chat UI screens** (needs Expo runtime): rewrite off Stream components onto the native
-   `useChatContext()`; remove `stream-chat-*` deps. (Bundle SEC-9 expo-secure-store.)
+3. **R4c-2 — chat UI screens** (needs Expo runtime). **Blocked on a device/simulator** — 4,294 lines
+   of Stream-based RN UI across 6 files; can't be rewritten/verified without `tsc` + a runtime (frontend
+   deps aren't installed here). Precise build spec: **`docs/R4c-2-chat-ui-handoff.md`**. The native
+   client (`ChatContext.js`) + backend are done and tested; this is pure UI + `stream-chat-*` dep removal.
 4. Start **Pesapal merchant onboarding** (long pole, ~1–2 wk approval). Pesapal IPN (SEC-8 webhook
    HMAC) + Collections/Disbursements land with payments (post-R, Stillwater P5).
 5. After Phase R lands → Stillwater 0–10 on the Python backend.
