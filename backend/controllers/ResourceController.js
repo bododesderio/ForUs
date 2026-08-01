@@ -1,3 +1,7 @@
+/**
+ * @author Bodo Desderio <rooiboktechltd@gmail.com>
+ * @copyright 2026 Rooibok Technologies. All rights reserved.
+ */
 import { createResource, getResources } from '../services/ResourceServices.js';
 
 export const uploadResource = async (req, res) => {

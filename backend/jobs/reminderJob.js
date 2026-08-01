@@ -1,3 +1,7 @@
+/**
+ * @author Bodo Desderio <rooiboktechltd@gmail.com>
+ * @copyright 2026 Rooibok Technologies. All rights reserved.
+ */
 import cron from 'node-cron';
 import { getUpcomingAppointments } from '../services/AppointmentServices.js';
 import { sendPushNotificationToUser, sendPushNotificationToConsultant, saveNotification } from '../services/UserServices.js';

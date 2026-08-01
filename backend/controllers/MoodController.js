@@ -1,3 +1,7 @@
+/**
+ * @author Bodo Desderio <rooiboktechltd@gmail.com>
+ * @copyright 2026 Rooibok Technologies. All rights reserved.
+ */
 import { getUserMood, setUserMood } from '../services/MoodServices.js';
 
 // GET /api/mood?date=YYYY-MM-DD

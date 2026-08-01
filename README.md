@@ -1,3 +1,7 @@
+<!--
+  @author Bodo Desderio <rooiboktechltd@gmail.com>
+  @copyright 2026 Rooibok Technologies. All rights reserved.
+-->
 # ForUs
 
 A mental wellness platform — therapist consultations, daily mood check-ins, peer community, and a curated resource library.

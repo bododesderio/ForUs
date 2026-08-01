@@ -1,3 +1,7 @@
+/**
+ * @author Bodo Desderio <rooiboktechltd@gmail.com>
+ * @copyright 2026 Rooibok Technologies. All rights reserved.
+ */
 import { View, Text } from 'react-native'
 import React, { useState } from 'react'
 import TabButtons, { TabButtonsType } from './TabButtons'

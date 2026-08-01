@@ -1,3 +1,7 @@
+/**
+ * @author Bodo Desderio <rooiboktechltd@gmail.com>
+ * @copyright 2026 Rooibok Technologies. All rights reserved.
+ */
 import express from 'express';
 import { profile, user, consultant, consultants, users, del_consultant, del_user, prof_update, savePushToken, sendPushNotification, saveConsultantPushToken, sendPushNotificationToConsultant, saveNotificationController, getUserNotifications, getConsultantNotifications, markNotificationRead, updateNotificationPreference } from '../controllers/UserController.js';
 import { authenticate } from '../middleware/auth.js';

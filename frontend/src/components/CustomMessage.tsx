@@ -1,3 +1,7 @@
+/**
+ * @author Bodo Desderio <rooiboktechltd@gmail.com>
+ * @copyright 2026 Rooibok Technologies. All rights reserved.
+ */
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert, Image, Pressable } from 'react-native';
 import Clipboard from '@react-native-clipboard/clipboard';

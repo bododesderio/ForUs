@@ -1,3 +1,7 @@
+<!--
+  @author Bodo Desderio <rooiboktechltd@gmail.com>
+  @copyright 2026 Rooibok Technologies. All rights reserved.
+-->
 # Stillwater Migration Plan
 
 **Goal:** Adopt the full Stillwater design system and feature set into ForUs1 — every screen, modal, flow, and supporting backend.

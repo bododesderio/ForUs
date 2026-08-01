@@ -1,3 +1,7 @@
+/**
+ * @author Bodo Desderio <rooiboktechltd@gmail.com>
+ * @copyright 2026 Rooibok Technologies. All rights reserved.
+ */
 import React, { createContext, useContext, useEffect, useState, useRef, useCallback } from 'react';
 import * as Notifications from 'expo-notifications';
 import { getAccessToken, API_BASE_URL } from '../services/api';

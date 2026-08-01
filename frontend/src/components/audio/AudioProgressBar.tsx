@@ -1,3 +1,7 @@
+/**
+ * @author Bodo Desderio <rooiboktechltd@gmail.com>
+ * @copyright 2026 Rooibok Technologies. All rights reserved.
+ */
 // AudioProgressBar.tsx - Custom audio progress bar with scrubbing
 import React from 'react';
 import { View, StyleSheet } from 'react-native';

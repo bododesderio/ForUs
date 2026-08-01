@@ -1,3 +1,7 @@
+/**
+ * @author Bodo Desderio <rooiboktechltd@gmail.com>
+ * @copyright 2026 Rooibok Technologies. All rights reserved.
+ */
 export default (req, res, next) => {
     if (!req.user) {
         return res.status(401).json({ success: false, message: 'Authentication required' });

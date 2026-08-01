@@ -1,3 +1,7 @@
+/**
+ * @author Bodo Desderio <rooiboktechltd@gmail.com>
+ * @copyright 2026 Rooibok Technologies. All rights reserved.
+ */
 // TODO: MOCK DATA — replace with API call before production
 import { Ionicons } from '@expo/vector-icons';
     id: number;

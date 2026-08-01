@@ -1,3 +1,7 @@
+/**
+ * @author Bodo Desderio <rooiboktechltd@gmail.com>
+ * @copyright 2026 Rooibok Technologies. All rights reserved.
+ */
 // app/(auth)/_layout.tsx
 import { Stack } from 'expo-router';
 import { View } from 'react-native';

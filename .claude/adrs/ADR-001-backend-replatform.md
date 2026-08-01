@@ -1,3 +1,7 @@
+<!--
+  @author Bodo Desderio <rooiboktechltd@gmail.com>
+  @copyright 2026 Rooibok Technologies. All rights reserved.
+-->
 # ADR-001 — Re-platform backend to Django + FastAPI; consolidate third-party services
 
 - **Status:** Proposed (awaiting approval — no code written)

@@ -1,3 +1,7 @@
+/**
+ * @author Bodo Desderio <rooiboktechltd@gmail.com>
+ * @copyright 2026 Rooibok Technologies. All rights reserved.
+ */
 import {registerUser, loginUser, registerConsultant, storeRefreshToken, revokeRefreshToken, findRefreshToken, changePasswordForAnyRole, saveAuthPushToken, sendPushNotificationToAuth} from '../services/AuthServices.js';
 import { pool } from "../db/index.js";
 import { logActivity } from "../services/ActivityService.js";

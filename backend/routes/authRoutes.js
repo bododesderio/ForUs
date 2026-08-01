@@ -1,3 +1,7 @@
+/**
+ * @author Bodo Desderio <rooiboktechltd@gmail.com>
+ * @copyright 2026 Rooibok Technologies. All rights reserved.
+ */
 import express from 'express';
 import {register, login, consultant, logout, changePassword, savePushToken, sendPushNotification} from '../controllers/AuthController.js';
 import { refreshToken } from '../middleware/auth.js';

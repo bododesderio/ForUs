@@ -1,3 +1,7 @@
+/**
+ * @author Bodo Desderio <rooiboktechltd@gmail.com>
+ * @copyright 2026 Rooibok Technologies. All rights reserved.
+ */
 import { WebSocketServer } from 'ws';
 import { handleConnection, startHeartbeat } from './services/ChatService.js';
 import { logger } from './utils/logger.js';

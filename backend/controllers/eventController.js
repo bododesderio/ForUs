@@ -1,3 +1,7 @@
+/**
+ * @author Bodo Desderio <rooiboktechltd@gmail.com>
+ * @copyright 2026 Rooibok Technologies. All rights reserved.
+ */
 import { createEvent, deleteEvent, getDetail, getEvents, updateEvent } from "../services/EventServices.js"
 import { validationResult } from "express-validator"
 import { logActivity } from "../services/ActivityService.js";

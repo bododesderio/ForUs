@@ -1,3 +1,7 @@
+/**
+ * @author Bodo Desderio <rooiboktechltd@gmail.com>
+ * @copyright 2026 Rooibok Technologies. All rights reserved.
+ */
 import { createAppointment, getAppointments, updateStatus, consultantReview, getConsultantAvailability, fetchConsultantReviewsPaginated, cancelExpiredAppointments, blockAppointmentSlot, confirmAppointment, rejectAppointment, rescheduleAppointment } from "../services/AppointmentServices.js"
 import { logActivity } from "../services/ActivityService.js";
 import { pool } from "../db/index.js";

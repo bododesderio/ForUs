@@ -1,3 +1,7 @@
+/**
+ * @author Bodo Desderio <rooiboktechltd@gmail.com>
+ * @copyright 2026 Rooibok Technologies. All rights reserved.
+ */
 import { pool } from '../db/index.js';
 import { logger } from '../utils/logger.js';
 import { v4 as uuid } from 'uuid';

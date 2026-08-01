@@ -1,3 +1,7 @@
+/**
+ * @author Bodo Desderio <rooiboktechltd@gmail.com>
+ * @copyright 2026 Rooibok Technologies. All rights reserved.
+ */
 import { View, Text, FlatList, StyleSheet, TouchableWithoutFeedback, Image, useWindowDimensions } from 'react-native'
 import React from 'react'
 import Animated, { AnimatedRef, interpolate, interpolateColor, SharedValue, useAnimatedStyle, withSpring, withTiming } from 'react-native-reanimated';
