@@ -13,7 +13,13 @@ from django.contrib.auth import password_validation
 from django.db.models import Avg, Count
 from rest_framework import serializers
 
-from .models import ConsultantDetails, Profile, Role, User
+from .models import Activity, ConsultantDetails, Profile, Role, User
+
+
+class ActivitySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Activity
+        fields = ["id", "type", "description", "created_at"]
 
 
 def build_user_payload(user: User) -> dict:

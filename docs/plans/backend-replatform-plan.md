@@ -77,7 +77,8 @@ infra/ (docker-compose, nginx)     frontend/ (unchanged Expo app)
 - **Accept:** parity harness green for all `/api/auth/*`; a token from Python auths a protected route.
   **Rollback:** gateway routes `/api/auth` back to Node.
 
-## R3 · Core CRUD domains (DRF)  — Est 10–14 p-days · blocked-by: R2
+## R3 · Core CRUD domains (DRF)  — 🚧 IN PROGRESS (R3a+R3b done 2026-08-01) · blocked-by: R2
+> Done: `mood`, `activities`, `events` (BUG-4 fixed), `resources`. Remaining: `appointments`, `users`.
 Port these route groups to DRF viewsets/serializers, preserving paths/shapes:
 `/api/users` · `/api/appointments` (incl. conflict detection, auto-cancel, confirm/reject/reschedule/
 cancel, reviews, start-session) · `/api/events` · `/api/mood` · `/api/resources` · `/api/activities`.

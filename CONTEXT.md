@@ -6,15 +6,16 @@
 Last updated: 2026-08-01
 
 ## Current task
-**Phase R2 COMPLETE & verified — next up R3 (core CRUD domains).** Express/Node →
-Django (DRF, core/CRUD/admin/payments) + FastAPI (realtime chat, video tokens,
-webhooks, AI/moderation), Postgres kept, big-bang pre-launch rewrite. Runs
-**before** the Stillwater feature migration. See `.claude/adrs/ADR-001-backend-replatform.md`
-+ `docs/plans/backend-replatform-plan.md`.
-R2 ported the `/api/auth/*` surface to DRF SimpleJWT: register-user (201),
-register-consultant (200), login-user, refresh-token (rotation+blacklist),
-logout, change-password, push-token — response envelopes match Node for cutover
-parity. Resolves SEC-1, SEC-3, SEC-7, BUG-2, BUG-3, ARCH-2. 14 auth tests green.
+**Phase R3 IN PROGRESS — R3a+R3b done, next R3c (appointments) + R3d (users).**
+Express/Node → Django (DRF, core/CRUD/admin/payments) + FastAPI (realtime chat,
+video tokens, webhooks, AI/moderation), Postgres kept, big-bang pre-launch rewrite.
+Runs **before** the Stillwater feature migration. See ADR-001 + `docs/plans/backend-replatform-plan.md`.
+R3 ports 6 CRUD domains (~42 endpoints) via DRF APIViews with path/shape parity:
+- **R3a done:** `mood` (2) + `activities` (1).
+- **R3b done:** `events` (5, BUG-4 fixed: non-admin → 403, proper partial update) + `resources` (2).
+- **R3c todo:** `appointments` (15: conflict detection, state machine, reviews, auto-cancel).
+- **R3d todo:** `users` (17: profile, consultants, notifications, push-token).
+33 django tests green. Shared `core/permissions.py` (`IsAdminRole`).
 
 ## What it is
 **ForUs** — a mobile-first mental wellness platform: therapist consultations,
@@ -57,6 +58,19 @@ Celery 10003, admin-web 10004, Node(transitional) 10005, Postgres 10010, Redis 1
 - Crisis SOS / safety plans / moderation — none (Phases 7, 9)
 - Goals, streaks, voice journal, session notes, earnings, audit log, billing
   dashboard, cohort analytics — none (Phases 3, 8, 9, 10)
+
+## Recent decisions (2026-08-01, R3a+R3b)
+- **DRF APIViews (not ModelViewSets)** — the Node paths are non-RESTful (`/events/get`,
+  `/events/details/:id`, `/resources/upload`); APIViews preserve exact paths/shapes/status codes.
+- **Success shapes copy Node exactly** (parity gate); only ERROR contract is normalized (ARCH-2).
+  Endpoints hand-return Node's precise error bodies (e.g. mood `{message:'Date is required'}`)
+  rather than raising, so the harness diffs clean.
+- **BUG-4 fixed:** `core/permissions.IsAdminRole` → non-admin event create/update/delete get **403**
+  (Node returned a plain object and hung). `update` is a true PATCH (only supplied fields; Node nulled omitted ones).
+- **Events pagination:** kept Node's offset envelope `{page,limit,total,pages}` for parity (not cursor).
+- **Resources list stays public** (Node had no auth); soft-deleted rows hidden by the default manager.
+- File **upload** for resources takes a `file_url` in the body (client already uploaded) — real
+  multipart→R2 is R5; R3 ports the record CRUD only.
 
 ## Recent decisions (2026-08-01, R2)
 - **Phase R2 executed & verified.** `/api/auth/*` on DRF SimpleJWT. Envelope parity with Node:
@@ -106,15 +120,18 @@ Celery 10003, admin-web 10004, Node(transitional) 10005, Postgres 10010, Redis 1
 - **Current (Node, transitional):** raw SQL `$1,$2`; services throw, controllers catch.
 - Ports: never hardcode — derive from lane 10000 (`ports` skill + `~/.claude/PORTS.md`).
 
-## Next steps (START R3 — core CRUD domains)
-1. **R3 — core CRUD (DRF viewsets/serializers), preserving paths/shapes.** Port
-   `/api/users` · `/api/appointments` (conflict detection, auto-cancel, confirm/reject/reschedule/
-   cancel, reviews, start-session) · `/api/events` · `/api/mood` · `/api/resources` · `/api/activities`.
-   Fixes BUG-4 (non-admin mutate → 403; invalid body → 400), ARCH-2 (continue), ARCH-3, PERF-1 (reads).
-   The frontend's `/users/push-token` + `/users/consultant/push-token` land here (auth push-token
-   already done in R2). Reuse `build_user_payload` and the `record_activity` helper.
-2. Start **Pesapal merchant onboarding** (long pole, ~1–2 wk approval) — in parallel.
-3. After Phase R lands → Stillwater 0–10 on the Python backend.
+## Next steps (finish R3)
+1. **R3c — `/api/appointments` (15 eps).** create, get user/consultant/availability, /get filtered,
+   /all, PATCH :id/status, reviews (+ paginated consultant reviews), block, confirm, reject,
+   reschedule, cancel, start-session. **Conflict detection** on create/block + **auto-cancel** of
+   expired pending (Celery in R6, logic here). State machine over `AppointmentStatus`. BUG-6 default
+   already in the model. Read `AppointmentController.js` + `AppointmentServices.js` for exact shapes.
+2. **R3d — `/api/users` (17 eps).** profile, update-profile, user/:id, consultant/:id, consultants,
+   users, delete/user|consultant/:id, push-token (+consultant), notifications save/list/read,
+   notification-preference. Reuse `build_user_payload`, `record_activity`. Frontend's
+   `/users/push-token` + `/users/consultant/push-token` land here. Resolves ARCH-3, PERF-1 (reads).
+3. Start **Pesapal merchant onboarding** (long pole, ~1–2 wk approval) — in parallel.
+4. After Phase R lands → Stillwater 0–10 on the Python backend.
 
 ## R0 done (2026-07-31) — scaffold verified booting healthy on lane 10000
 - `services/django-api/` (Django 5 + DRF, SimpleJWT rotation+blacklist, fail-fast env, structlog,

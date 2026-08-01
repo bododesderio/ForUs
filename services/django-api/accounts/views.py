@@ -18,8 +18,9 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from .models import Profile, User
+from .models import Activity, Profile, User
 from .serializers import (
+    ActivitySerializer,
     ChangePasswordSerializer,
     LoginSerializer,
     LogoutSerializer,
@@ -181,3 +182,13 @@ class PushTokenView(APIView):
         profile.push_token = ser.validated_data["pushToken"]
         profile.save(update_fields=["push_token"])
         return Response({"message": "Push token saved successfully"}, status=status.HTTP_200_OK)
+
+
+class ActivityListView(APIView):
+    """GET /api/activities → the caller's 20 most recent activities (raw array, Node parity)."""
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request: Request) -> Response:
+        rows = Activity.objects.filter(user=request.user).order_by("-created_at")[:20]
+        return Response(ActivitySerializer(rows, many=True).data, status=status.HTTP_200_OK)

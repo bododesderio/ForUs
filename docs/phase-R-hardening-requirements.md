@@ -90,7 +90,7 @@ cutover gate) unless a change ships with a matching frontend edit.
 | **R0** | SEC-5, SEC-7 (handler), BUG-1 (CI boot/route test) |
 | **R1** ✅ | ARCH-1 (Django-owned reversible migrations; FastAPI reflects via Core), ARCH-4 (`community_*` + `password_reset_tokens` modeled, dormant), BUG-6 (`DEFAULT_DURATION_MINUTES=60`) — verified up+down on a scratch DB, Admin lists all 19 models, Core reads a row |
 | **R2** ✅ | SEC-1 (push-token auth-gated, owner=request.user; send-notification unexposed), SEC-3 (rotation+blacklist, reuse→403), SEC-7 (prod-safe messages), BUG-2 (every path responds), BUG-3 (missing fields→400), ARCH-2 (one `{success,message,errors}` envelope) — 14 auth tests green |
-| **R3** | PERF-1 (read side), BUG-4, ARCH-2, ARCH-3 |
+| **R3** 🚧 | BUG-4 ✅ (events: non-admin→403, no hang; true PATCH) · ARCH-2 (continued) · PERF-1, ARCH-3 pending appointments/users |
 | **R4** | SEC-2, SEC-4, SEC-8, SEC-9, BUG-7, PERF-3, PERF-4, PERF-5, PERF-6, ARCH-5 (chat) |
 | **R5** | SEC-6 |
 | **R6** | PERF-1 (job side), PERF-2, BUG-5 |

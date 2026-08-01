@@ -91,3 +91,15 @@ Created: 2026-07-27
   - RefreshToken(str) construction already raises on a blacklisted token (BlacklistMixin.verify) → that IS the reuse check; then .blacklist() to rotate.
 - **Verified:** 16 django tests green (2 health + 14 auth), ruff clean. Postgres 10010.
 - **Deferred:** login throttling (no finding). **Resume:** R3 (core CRUD: users/appointments/events/mood/resources/activities) + Pesapal onboarding.
+
+## [2026-08-01] — Phase R3a+R3b: mood, activities, events, resources (DRF)
+- **Scope:** R3 = 6 CRUD domains ~42 eps. Done this pass: mood(2), activities(1), events(5), resources(2). Remaining: appointments(15, R3c), users(17, R3d).
+- **Decisions:**
+  - DRF **APIViews not ModelViewSets** — Node paths are non-RESTful (/events/get, /events/details/:id, /resources/upload); APIViews preserve exact paths/shapes/status codes.
+  - Success responses copy Node shapes exactly (parity gate). Only the ERROR contract is normalized (ARCH-2 handler). Hand-return Node's precise error bodies (e.g. mood {message:'Date is required'}) instead of raising ValidationError, so harness diffs clean.
+  - BUG-4 fixed via core/permissions.IsAdminRole → non-admin event create/update/delete = 403 (Node hung). Event update = true PATCH (only supplied fields; Node nulled omitted).
+  - Events pagination = Node offset envelope {page,limit,total,pages} (parity, not cursor). Resources list public (AllowAny); soft-deleted hidden by default manager.
+  - Resource "upload" = record CRUD with file_url in body; real multipart→R2 is R5.
+- **Files:** core/permissions.py; wellness/{serializers,views,urls}.py; content/{serializers,views,urls}.py; accounts ActivityListView + serializer + urls_activities.py; forus/urls.py mounts (/api/mood, /api/activities, /api/ for content). Tests: wellness/tests/test_mood, content/tests/test_{events,resources}, accounts/tests/test_activities.
+- **Gotchas:** mount /api/mood via path("api/mood", include(wellness.urls)) + path("") to avoid trailing-slash redirect. content mounted at path("api/") alongside core — full subpaths (events/..., resources).
+- **Verified:** 33 django tests green (16 prior + 17 new), ruff clean. **Resume:** R3c appointments (read AppointmentController.js + AppointmentServices.js; conflict detection + auto-cancel + state machine), then R3d users.
