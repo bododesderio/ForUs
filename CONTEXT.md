@@ -6,19 +6,18 @@
 Last updated: 2026-08-01
 
 ## Current task
-**Phase R3 IN PROGRESS — R3a+R3b+R3c done, only R3d (users) left.**
+**Phase R3 COMPLETE — next up R4 (realtime chat on FastAPI).**
 Express/Node → Django (DRF, core/CRUD/admin/payments) + FastAPI (realtime chat,
 video tokens, webhooks, AI/moderation), Postgres kept, big-bang pre-launch rewrite.
 Runs **before** the Stillwater feature migration. See ADR-001 + `docs/plans/backend-replatform-plan.md`.
-R3 ports 6 CRUD domains (~42 endpoints) via DRF APIViews with path/shape parity:
-- **R3a done:** `mood` (2) + `activities` (1).
-- **R3b done:** `events` (5, BUG-4 fixed: non-admin → 403, proper partial update) + `resources` (2).
-- **R3c done:** `appointments` (15: conflict detection, state machine, reviews, auto-cancel,
-  availability, block-slot). BUG-6 default (60) applied on create/block. **Closed a latent IDOR**:
-  `/user/<id>` + `/consultant/<id>` lists now require owner-or-admin (Node had no check).
-  Push notifications on transitions deferred to R6 (Celery).
-- **R3d todo:** `users` (17: profile, consultants, notifications, push-token).
-49 django tests green. Shared `core/permissions.py` (`IsAdminRole`).
+R3 ported all 6 CRUD domains (~42 endpoints) via DRF APIViews with path/shape parity:
+- **R3a:** `mood` (2) + `activities` (1).
+- **R3b:** `events` (5, BUG-4 fixed) + `resources` (2).
+- **R3c:** `appointments` (15: conflict detection, state machine, reviews, auto-cancel, availability).
+- **R3d:** `users` (17: profile, details, consultant/user lists, deletes, push-token, notifications).
+59 django tests green. Shared `core/permissions.py` (`IsAdminRole`). Resolves BUG-4, BUG-6,
+ARCH-2/ARCH-3, PERF-1(reads) + three proactive security fixes (appointment IDOR, `/users` PII
+gate, admin-only `send-notification`). Push delivery + auto-cancel scheduling → R6 (Celery).
 
 ## What it is
 **ForUs** — a mobile-first mental wellness platform: therapist consultations,
@@ -61,6 +60,17 @@ Celery 10003, admin-web 10004, Node(transitional) 10005, Postgres 10010, Redis 1
 - Crisis SOS / safety plans / moderation — none (Phases 7, 9)
 - Goals, streaks, voice journal, session notes, earnings, audit log, billing
   dashboard, cohort analytics — none (Phases 3, 8, 9, 10)
+
+## Recent decisions (2026-08-01, R3d)
+- **Users domain ported** (17 eps) in `accounts/user_{views,services,urls}.py`, mounted `/api/users/`.
+  Payload builders match Node's SELECT column shapes exactly (profile, user/consultant detail, lists).
+- **[SECURITY] `GET /users` is admin-only** — Node let any authed caller list every user's email/PII.
+- **[SECURITY] `send-notification` (+consultant) admin-only** — Node let anyone push to any id (SEC-1 class).
+  Push delivery deferred to R6; the endpoints persist a `notifications` row.
+- Push-token + notification read/preference derive the owner from `request.user`; mark-read is
+  ownership-scoped (`filter(recipient=request.user)`), so one user can't touch another's notifications.
+- The frontend's real `/users/push-token` + `/users/consultant/push-token` now exist here (the R2
+  auth push-token remains for SEC-1 coverage).
 
 ## Recent decisions (2026-08-01, R3c)
 - **Appointments ported** (15 eps) via APIViews + `appointments/services.py` (auto-cancel, conflict
@@ -138,12 +148,12 @@ Celery 10003, admin-web 10004, Node(transitional) 10005, Postgres 10010, Redis 1
 - **Current (Node, transitional):** raw SQL `$1,$2`; services throw, controllers catch.
 - Ports: never hardcode — derive from lane 10000 (`ports` skill + `~/.claude/PORTS.md`).
 
-## Next steps (finish R3 → R3d, then R4)
-1. **R3d — `/api/users` (17 eps).** profile, update-profile, user/:id, consultant/:id, consultants,
-   users, delete/user|consultant/:id, push-token (+consultant), notifications save/list/read,
-   notification-preference. Reuse `build_user_payload`, `record_activity`. Frontend's
-   `/users/push-token` + `/users/consultant/push-token` land here. Resolves ARCH-3, PERF-1 (reads).
-   Read `UserController.js` + `UserServices.js`. Apply the same owner-or-admin guard on `/user/:id`.
+## Next steps (START R4 — realtime chat on FastAPI)
+1. **R4 — chat.** Port `/api/chat` room/message REST to Django (DRF), move the realtime layer
+   (Node `ws.js` + Stream Chat) to **FastAPI WebSockets** at `/ws/**`, fanning out via **Redis
+   pub/sub** (multi-worker). Persist to `chat_messages`/`message_reactions`. **Drop Stream Chat.**
+   Resolves SEC-2 (room membership authz), SEC-4 (WS token in query), BUG-7 (persist-then-broadcast),
+   PERF-3..6, ARCH-5. Frontend: repoint `ChatContext.js` WS URL; remove `stream-chat-*` deps.
 2. Start **Pesapal merchant onboarding** (long pole, ~1–2 wk approval) — in parallel.
 3. After Phase R lands → Stillwater 0–10 on the Python backend.
 

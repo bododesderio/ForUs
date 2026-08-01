@@ -116,3 +116,14 @@ Created: 2026-07-27
   - Push notifications on transitions all deferred to R6.
 - **Gotchas:** UUID PKs → dropped Node's isNaN(consultantId) validity check (always true for UUIDs). URL order: literal (create/get/all/block) + typed converters; consultant/<id>/availability distinct from consultant/<id>.
 - **Verified:** 49 django tests green (33 prior + 16 appt), ruff clean. **Resume:** R3d users (17 eps) — last of R3; read UserController.js + UserServices.js; apply same owner-or-admin guard.
+
+## [2026-08-01] — Phase R3d: users (17 eps) — R3 COMPLETE
+- **Files:** accounts/user_{views,services,urls}.py + tests/test_users.py; forus/urls.py (+/api/users/). User endpoints live in accounts (User/Profile/ConsultantDetails) + import content.Notification.
+- **Decisions:**
+  - Payload builders (user_services.py) mirror Node SELECT columns exactly: profile_payload (self, +consultant fields), user_detail_payload, consultant_detail_payload, list_consultants/list_users (offset pagination + sort map + search/profession/role filters). Sort maps use reverse-FK lookups (profile__first_name, consultant_detail__rating).
+  - [SECURITY] GET /users admin-only (Node leaked all emails/PII). send-notification (+consultant) admin-only (Node let anyone push to any id — SEC-1 class); delivery deferred to R6, persists a notifications row.
+  - push-token/notification read/preference derive owner from request.user; mark-read filter(recipient=request.user) so cross-user marking is a no-op. delete user/consultant = soft (User.delete sets deleted_at+is_active=False), admin-only.
+  - The frontend's real /users/push-token + /users/consultant/push-token live here (R2 auth push-token stays for SEC-1).
+- **R3 COMPLETE:** 6 domains, ~42 eps, 59 django tests. Resolves BUG-4, BUG-6, ARCH-2, ARCH-3, PERF-1(reads) + 3 proactive security fixes. Push delivery + auto-cancel scheduling → R6.
+- **Gotchas:** URL order — consultant/{notifications,push-token,send-notification} literals before consultant/<uuid:pk> (uuid converter is strict so safe either way). NotificationsView reused for /notifications and /consultant/notifications (Node getConsultantNotifications == getNotificationsForUser(req.user.id)).
+- **Resume:** R4 — chat REST to Django + realtime to FastAPI WS (Redis pub/sub), drop Stream Chat. SEC-2/SEC-4/BUG-7/PERF-3..6/ARCH-5. Read chatRoutes.js, ChatController.js, ChatService.js, ws.js; frontend ChatContext.js.
