@@ -1,3 +1,7 @@
+/**
+ * @author Bodo Desderio <rooiboktechltd@gmail.com>
+ * @copyright 2026 Rooibok Technologies. All rights reserved.
+ */
 // AppointmentTimeManager.js - Fixed version with error handling and missing methods
 class AppointmentTimeManager {
     constructor() {

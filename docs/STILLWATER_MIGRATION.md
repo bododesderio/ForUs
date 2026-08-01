@@ -1,3 +1,7 @@
+<!--
+  @author Bodo Desderio <rooiboktechltd@gmail.com>
+  @copyright 2026 Rooibok Technologies. All rights reserved.
+-->
 # Stillwater Migration Plan
 
 **Goal:** Adopt the full Stillwater design system and feature set into ForUs1 — every screen, modal, flow, and supporting backend.
@@ -370,7 +374,7 @@ packages/
 - `ScreenVoiceJournal` — record, on-device transcribe via Expo Speech / `expo-speech`, save to `voice_entries`
 
 **Backend**
-- `POST /api/voice-entries` — accepts audio file (multipart), stores in MinIO/S3, attaches transcript
+- `POST /api/voice-entries` — accepts audio file (multipart), stores in **Cloudflare R2** (via the Django upload path / django-storages, R5), attaches transcript
 
 ---
 

@@ -1,0 +1,48 @@
+# @author Bodo Desderio <rooiboktechltd@gmail.com>
+# @copyright 2026 Rooibok Technologies. All rights reserved.
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+# Deps-only install: the service runs from its working dir (uvicorn app.main:app),
+# so no source packages are built — avoids setuptools flat-layout auto-discovery.
+[tool.setuptools]
+py-modules = []
+
+[project]
+name = "forus-fastapi-rt"
+version = "0.1.0"
+description = "ForUs realtime tier (FastAPI): WS chat, video tokens, Pesapal IPN, moderation"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.111",
+    "uvicorn[standard]>=0.30",
+    "asyncpg>=0.29",
+    "sqlalchemy>=2.0",
+    "redis>=5.0",
+    "pydantic-settings>=2.3",
+    "httpx>=0.27",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.2",
+    "pytest-asyncio>=0.23",
+    "ruff>=0.5",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+ignore = ["E501"]
+
+[tool.pytest.ini_options]
+python_files = ["test_*.py"]
+addopts = "-q"
+asyncio_mode = "auto"
+# Repo root on the path so the shared `libs.db` reflection package imports in CI,
+# where pytest runs from this service directory.
+pythonpath = ["../.."]

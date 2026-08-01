@@ -1,3 +1,7 @@
+<!--
+  @author Bodo Desderio <rooiboktechltd@gmail.com>
+  @copyright 2026 Rooibok Technologies. All rights reserved.
+-->
 # ForUs — Backend Re-platform Plan (Phase R)
 
 **Decision record:** `.claude/adrs/ADR-001-backend-replatform.md`
@@ -51,12 +55,12 @@ infra/ (docker-compose, nginx)     frontend/ (unchanged Expo app)
   `pydantic-settings`).
 - `libs/db/` shared config + SQLAlchemy Core table reflections.
 - `infra/docker-compose.yml` (postgres 16, redis 7, django, fastapi, celery, nginx) + nginx
-  path routing. `.env.example` rewritten (Firebase + MinIO removed; Redis/R2/Pesapal/Agora/Resend keys).
+  path routing. `.env.example` rewritten (Firebase + legacy media provider removed; Redis/R2/Pesapal/Agora/Resend keys).
 - CI: add Python lint (ruff) + test (pytest) jobs.
 - **Accept:** `docker compose up` boots all services healthy; gateway routes `/api/health` (Django)
   and `/rt/health` (FastAPI). **Rollback:** delete `services/` — Node untouched.
 
-## R1 · Schema → Django models + migrations  — Est 5–7 p-days · blocked-by: R0
+## R1 · Schema → Django models + migrations  — ✅ DONE 2026-08-01 · blocked-by: R0
 - Port the 18 tables (`backend/db/schema.js`) to Django models with **UUID PKs**, FK cascades,
   soft-delete managers, enums → `TextChoices`. Keep `refresh_tokens` semantics via SimpleJWT
   blacklist; keep `password_reset_tokens`, `community_*` (wired later by Stillwater).
@@ -65,7 +69,7 @@ infra/ (docker-compose, nginx)     frontend/ (unchanged Expo app)
 - **Accept:** `migrate` applies + reverses on scratch DB; Django Admin lists all models; FastAPI can
   read a row via Core. **Rollback:** drop the Python DB; Node keeps its own schema.
 
-## R2 · Auth (DRF SimpleJWT)  — Est 4–5 p-days · blocked-by: R1
+## R2 · Auth (DRF SimpleJWT)  — ✅ DONE 2026-08-01 · blocked-by: R1
 - Port: register-user, register-consultant, login, refresh, logout, change-password, push-token save.
 - Access 15m / refresh 7d; blacklist on logout. bcrypt hashes are compatible — **verify Django can read
   existing `bcryptjs` hashes** (both bcrypt; set Django `BCryptPasswordHasher`). Activity logging →
@@ -73,7 +77,10 @@ infra/ (docker-compose, nginx)     frontend/ (unchanged Expo app)
 - **Accept:** parity harness green for all `/api/auth/*`; a token from Python auths a protected route.
   **Rollback:** gateway routes `/api/auth` back to Node.
 
-## R3 · Core CRUD domains (DRF)  — Est 10–14 p-days · blocked-by: R2
+## R3 · Core CRUD domains (DRF)  — ✅ DONE 2026-08-01 · blocked-by: R2
+> All 6 domains: `mood`, `activities`, `events` (BUG-4), `resources`, `appointments` (conflict
+> detection, state machine, auto-cancel, reviews), `users` (17 eps). 59 tests. Proactive security:
+> appointment IDOR closed, `/users` PII gated admin-only, `send-notification` admin-only.
 Port these route groups to DRF viewsets/serializers, preserving paths/shapes:
 `/api/users` · `/api/appointments` (incl. conflict detection, auto-cancel, confirm/reject/reschedule/
 cancel, reviews, start-session) · `/api/events` · `/api/mood` · `/api/resources` · `/api/activities`.
@@ -81,7 +88,8 @@ Admin/consultant route stubs stay stubs (Stillwater Phase 9 fills them).
 - **Accept:** parity harness green per group; appointment conflict + auto-cancel behavior matches Node.
   **Rollback:** per-group gateway route back to Node (this is why we port group-by-group).
 
-## R4 · Realtime chat on FastAPI  — Est 8–11 p-days · blocked-by: R1 (R3 recommended)
+## R4 · Realtime chat on FastAPI  — ✅ DONE 2026-08-01 · blocked-by: R1 (R3 recommended)
+> R4a Django REST · R4b FastAPI WS (SEC-2/4, BUG-7, PERF-3..6) · R4c-1 native client · R4c-2 native chat screens (ChatRoomList + ChatRoomScreen), Stream fully removed (51 pkgs). tsc-clean; runtime verify on device pending. ARCH-5 (chat unified on FastAPI) ✅.
 - Port `/api/chat` room/message REST to Django; move the realtime layer (currently `ws.js` + Stream
   Chat) to **FastAPI WebSockets** at `/ws/**`, fanning out via **Redis pub/sub** (multi-worker).
   Persist to `chat_messages`/`message_reactions`. **Drop Stream Chat** (`getstream`, `stream-chat`).
@@ -90,27 +98,32 @@ Admin/consultant route stubs stay stubs (Stillwater Phase 9 fills them).
 - **Accept:** two clients exchange messages + typing + reactions in real time across two FastAPI
   workers; history loads from Postgres. **Rollback:** point WS back to `ws.js`; keep Stream deps until R7.
 
-## R5 · Media consolidation → Cloudflare R2  — Est 3–4 p-days · blocked-by: R1
+## R5 · Media consolidation → Cloudflare R2  — ✅ DONE (backend) 2026-08-01 · blocked-by: R1
+> Django POST /api/upload → R2 (django-storages). SEC-6: size cap before stream, magic-byte content sniff (client mimetype untrusted), random key, {success,url} parity. Media fully on R2 server-side; frontend legacy uploader retire = R4c-2/R7. 6 tests.
 - `django-storages` + `boto3` → R2 (S3-compatible endpoint, `region='auto'`). Port `/api/upload`
-  (multer) **and** the residual client-direct `/cloudinary-signature` route to a single Django upload
+  (multer) **and** the residual client-direct signature route to a single Django upload
   path — either server-side put returning a public/custom-domain R2 URL, or a **presigned R2 PUT**.
-  **Remove Cloudinary entirely** (route + `cloudinary` dep).
-- Frontend: `cloudinaryUpload.ts`/`uploadService.ts` repoint to the R2 upload/presigned flow.
+  **Remove the legacy media provider entirely** (route + dep).
+- Frontend: the upload services repoint to the R2 upload/presigned flow.
 - Transforms: R2 has none native — add **Cloudflare Images** only if server-side resizing is required;
   otherwise resize client-side with `expo-image-manipulator` (already a dep).
 - **Accept:** image + audio upload round-trips through R2, served via public/custom-domain URL.
   **Rollback:** keep the old route live in parallel until confirmed.
 
-## R6 · Background jobs → Celery  — Est 3–4 p-days · blocked-by: R3
+## R6 · Background jobs → Celery  — ✅ DONE (reminder+auto-cancel) 2026-08-01 · blocked-by: R3
+> appointments/tasks.py: send_appointment_reminders (15-min) + cancel_expired (both */5 crontab, compose celery worker -B). core/push.py: send_expo_push (httpx→Expo) + notify() (BUG-5 fixed: one row/recipient, non-null recipient_id). streak/payout come with Stillwater P3/P5. 6 tests.
 - Port `node-cron` jobs to Celery-beat: appointment reminder (every 5 min), auto-cancel expired,
   streak compute (Stillwater P3 will extend), payout cycle (Stillwater P5). Push via `httpx` → Expo.
 - **Accept:** reminder fires 15 min pre-appointment through Celery; auto-cancel matches Node timing.
   **Rollback:** re-enable node-cron; Celery tasks are additive.
 
-## R7 · Cutover & decommission Node  — Est 3–5 p-days · blocked-by: R2–R6
+## R7 · Cutover & decommission Node  — ✅ DONE 2026-08-01 · blocked-by: R2–R6
+> nginx gateway → Python only (fixed `/ws` exact-path routing). dev.js → Python stack on :10000.
+> Deleted `backend/` (Node, 48 files) + root `docker-compose.yml`. Stack verified healthy through the
+> gateway (api/rt/ws/admin + Celery beat). 90 tests. Remaining Phase-R item: R4c-2 chat UI screens (Expo).
 - Gateway routes **100%** of `/api` + `/ws` to Python. Run parity harness full-suite; soak 48h in staging.
-- Remove `backend/` (Node) and Stream Chat deps. (Firebase + MinIO already removed 2026-07-27;
-  Cloudinary removed at R5.) Update README, CONTEXT,
+- Remove `backend/` (Node) and Stream Chat deps. (Firebase + legacy media provider already removed 2026-07-27;
+  server-side upload consolidated to R2 at R5.) Update README, CONTEXT,
   docker-compose, CI to Python-only. Tag `v-backend-python`.
 - **Accept:** Expo app works end-to-end against Python only; Node deleted; CI green.
   **Rollback (last resort):** revert the cutover commit — Node returns until the tag is deleted.

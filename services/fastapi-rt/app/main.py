@@ -1,0 +1,73 @@
+# @author Bodo Desderio <rooiboktechltd@gmail.com>
+# @copyright 2026 Rooibok Technologies. All rights reserved.
+"""
+FastAPI realtime tier entry point.
+
+R0 ships the app skeleton + health probe. The WS chat layer (Redis pub/sub fan-out,
+SEC-2/SEC-4/BUG-7/PERF-3..5), Agora video-token issuer, and Pesapal IPN land in R4/R5.
+Gateway routes /rt/** and /ws/** here.
+"""
+from __future__ import annotations
+
+import asyncio
+import logging
+from contextlib import asynccontextmanager
+
+from fastapi import FastAPI
+from fastapi.responses import JSONResponse
+from libs.db import tables
+
+from .chat.manager import ConnectionManager, MembershipCache
+from .chat.ws import chat_ws, pubsub_listener
+from .db import check_database, check_redis, make_engine, make_redis
+
+logger = logging.getLogger("forus.rt")
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    app.state.engine = make_engine()
+    app.state.redis = make_redis()
+    # Reflect Django-owned tables once at boot. Tolerant: a cold DB must not block
+    # startup — health stays authoritative and the first reader re-reflects lazily.
+    app.state.db_metadata = None
+    try:
+        app.state.db_metadata = await tables.reflect(app.state.engine)
+    except Exception:  # pragma: no cover - only when DB is unavailable at boot
+        logger.warning("schema reflection deferred: database unavailable at startup")
+    # Realtime chat: per-worker registry + the Redis pub/sub fan-out listener.
+    app.state.chat_manager = ConnectionManager()
+    app.state.chat_members_cache = MembershipCache()
+    app.state.chat_pubsub = None
+    app.state.chat_task = asyncio.create_task(pubsub_listener(app))
+    try:
+        yield
+    finally:
+        app.state.chat_task.cancel()
+        if app.state.chat_pubsub is not None:
+            try:
+                await app.state.chat_pubsub.aclose()
+            except Exception:  # pragma: no cover
+                pass
+        await app.state.engine.dispose()
+        await app.state.redis.aclose()
+
+
+app = FastAPI(title="ForUs Realtime", version="0.1.0", lifespan=lifespan)
+app.add_api_websocket_route("/ws", chat_ws)
+
+
+@app.get("/rt/health")
+async def health() -> JSONResponse:
+    db_ok = await check_database(app.state.engine)
+    redis_ok = await check_redis(app.state.redis)
+    healthy = db_ok and redis_ok
+    return JSONResponse(
+        {
+            "service": "fastapi-rt",
+            "status": "ok" if healthy else "degraded",
+            "database": "ok" if db_ok else "down",
+            "redis": "ok" if redis_ok else "down",
+        },
+        status_code=200 if healthy else 503,
+    )

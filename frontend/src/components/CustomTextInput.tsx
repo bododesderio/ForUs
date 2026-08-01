@@ -1,3 +1,7 @@
+/**
+ * @author Bodo Desderio <rooiboktechltd@gmail.com>
+ * @copyright 2026 Rooibok Technologies. All rights reserved.
+ */
 import { View, Text, TextInput, StyleSheet, StyleProp, ViewStyle } from 'react-native'
 import React, { ComponentProps, useState } from 'react'
 import { useController } from 'react-hook-form';

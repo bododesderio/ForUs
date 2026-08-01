@@ -1,4 +1,10 @@
+<!--
+  @author Bodo Desderio <rooiboktechltd@gmail.com>
+  @copyright 2026 Rooibok Technologies. All rights reserved.
+-->
 # ForUs — Stillwater Implementation Plan (Phases 0–10)
+
+> **⚠ RECONCILIATION (2026-08-01):** written against the Node/Drizzle backend, which is **deleted** (Phase R). Backend is now **Django (`services/django-api`) + FastAPI (`services/fastapi-rt`)**. Absorbed by Phase R: **P1 schema → R1** (Django models/migrations), **P0 test harness → Phase R** (98 tests). Backend routes below map to DRF/FastAPI, not Express. **P4 community-feed backend: ✅ DONE** (`/api/community/*`).
 
 **Source of record:** `docs/STILLWATER_MIGRATION.md`
 **Planned:** 2026-07-27 · **Status:** DRAFT for review — no code written, nothing committed.
@@ -171,6 +177,7 @@ unaffected; `npm test` green. ⟨No design dependency.⟩
 ---
 
 # Phase 2 · Onboarding redesign (12 screens) + real email
+> **backend ✅ DONE 2026-08-01:** forgot-password (POST /api/auth/forgot-password + /reset-password on the R1 password_reset_tokens model, no account enumeration) + email verification (verify-email/request + /confirm via signed token, sets email_verified) + Resend email service (core/email.py, no-op without key). 7 tests.
 **Blocked-by:** Phases 0, 1. **Est: 7–9 person-days.**
 
 ### Screens (replace `frontend/src/app/(auth)/onBoarding.tsx` Lottie carousel) ⟨design unresolved — B‑1⟩
@@ -196,6 +203,7 @@ new `onboardingRoutes/Controller/Services`, `EmailService.js` (implement), `remi
 ---
 
 # Phase 3 · User app core (10+ screens) + stats
+> **backend ✅ DONE 2026-08-01 (Django):** schema (moods +mood_color/feeling_tags/note, profiles +streak_days; reversible migration) · rich check-in (POST /api/mood) · GET /api/profile/stats {streak_days,total_sessions,total_practice_minutes,mood_trend_30d} · GET /api/search?q= (resources+consultants) · daily recompute_streaks Celery task. 5 tests. Screens are B-1 design-blocked / need runtime.
 **Blocked-by:** Phases 0, 1 (2 recommended). **Est: 10–12 person-days.**
 
 ### Screens ⟨design unresolved — B‑1⟩ (replace, don't delete — keep old routes during transition)
@@ -218,7 +226,8 @@ writes all three to `moods`), `ScreenLibrary` (replaces `ResourceViewer`/`Articl
 
 ---
 
-# Phase 4 · Community / peer feed
+# Phase 4 · Community / peer feed  — 🚧 backend ✅ DONE 2026-08-01 (Django)
+> Built on R1 `community_*` models: /api/community/posts (feed+create), post detail/delete, like/unlike, comments. Pseudonymous via username; owner/admin gating; soft-delete. 8 tests. TODO: groups + typed reactions (new schema), feed UI (B-1), handle-gen on signup.
 **Blocked-by:** Phases 0, 1, 3. **Est: 5–6 person-days.**
 
 ### Activate dormant `community_posts/likes/comments` tables (currently no API; frontend uses
@@ -312,6 +321,7 @@ escalate flag to admin queue (`moderation_flags`).
 ---
 
 # Phase 8 · Therapist tools + tablet
+> **backend ✅ DONE 2026-08-01 (Django):** new `consultant` app + `session_notes` table + consultant_details(+session_rate,+currency). GET/POST /api/consultant/notes/:appointment_id (SOAP, owner-gated) · /earnings?period (from rate; 25% fee; all pending until P5 disbursements) · /clients · /clients/:id/mood-trend (relationship-gated). IsConsultantRole. 6 tests. Screens B-1; earnings reconciliation needs P5.
 **Blocked-by:** Phases 0, 1, 5. **Est: 10–12 person-days.**
 ### Phone screens ⟨design unresolved — B‑1⟩: `ScreenTNotes` (SOAP editor, auto-save, share-with-client
 toggle → `session_notes`), Earnings tab (replaces stub `(consultants)/index.tsx` region: monthly bar
@@ -329,6 +339,7 @@ shows week grid, portrait falls back to phone layout.
 ---
 
 # Phase 9 · Admin — desktop web (Next.js) + slim Expo admin + RBAC + monorepo
+> **partial backend ✅ 2026-08-01 (Django):** audit log — `audit_logs` table + core.audit.record_audit() wired into admin destructive/sensitive actions (user/consultant delete, event create/update/delete, send-notification) + GET /api/audit-log (admin-only, paginated, filter by action/actor_id) + read-only Django admin. RBAC otherwise = IsAdminRole + Django admin. Remaining P9: Next.js admin-web app + monorepo (frontend/new surface).
 **Blocked-by:** Phases 0, 1, 5 (billing data), 7 (moderation). **Est: 18–22 person-days.**
 ### Monorepo restructure (introduced here):
 ```
@@ -358,7 +369,7 @@ flag that falls back to the flat `role` check; audit middleware is additive.
 **Blocked-by:** Phases 0, 1, 3. **Est: 5–6 person-days.** *(Optional — punt if running long.)*
 ### Screen ⟨design unresolved — B‑1⟩: `ScreenVoiceJournal` (record → on-device transcribe via
 `expo-speech` → save to `voice_entries`; reuse existing `VoiceRecorder.tsx`).
-### Backend: `POST /api/voice-entries` (multipart audio → MinIO/S3 via existing `StorageService`, attach transcript).
+### Backend: `POST /api/voice-entries` (multipart audio → **Cloudflare R2** via the Django upload path — `core.media` / django-storages, R5 — attach transcript). *(Node `StorageService` is gone.)*
 ### Acceptance: record → transcribe → row in `voice_entries` with audio URL + transcript.
 ### Risk: on-device transcription accuracy — acceptable for v1; server Whisper fallback documented.
 ### Rollback: feature-flag; endpoint additive.

@@ -1,3 +1,7 @@
+/**
+ * @author Bodo Desderio <rooiboktechltd@gmail.com>
+ * @copyright 2026 Rooibok Technologies. All rights reserved.
+ */
 import { LayoutChangeEvent, Pressable, StyleSheet, Text, View } from 'react-native'
 import React, { useState } from 'react'
 import { useTheme } from '../context/ThemeContext';

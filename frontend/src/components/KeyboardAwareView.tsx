@@ -1,3 +1,7 @@
+/**
+ * @author Bodo Desderio <rooiboktechltd@gmail.com>
+ * @copyright 2026 Rooibok Technologies. All rights reserved.
+ */
 import { ScrollView, KeyboardAvoidingView, Platform } from 'react-native'
 import React, { PropsWithChildren } from 'react'
 import { SafeAreaView } from 'react-native-safe-area-context'

@@ -1,3 +1,7 @@
+/**
+ * @author Bodo Desderio <rooiboktechltd@gmail.com>
+ * @copyright 2026 Rooibok Technologies. All rights reserved.
+ */
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { loginUser, registerUser, logoutUser, getStoredToken, getStoredUserData, saveUserPushToken, saveConsultantPushToken, updateNotificationPreference } from '../services/api';
 import { registerForPushNotificationsAsync } from '../services/pushNotifications';

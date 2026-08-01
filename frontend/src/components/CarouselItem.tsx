@@ -1,3 +1,7 @@
+/**
+ * @author Bodo Desderio <rooiboktechltd@gmail.com>
+ * @copyright 2026 Rooibok Technologies. All rights reserved.
+ */
 import { View, Text, TouchableOpacity, StyleSheet, Dimensions, ImageBackground } from 'react-native'
 import Ionicons from '@expo/vector-icons/Ionicons';
 import React, { useCallback, useState } from 'react'

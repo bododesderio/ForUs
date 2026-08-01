@@ -1,0 +1,97 @@
+# @author Bodo Desderio <rooiboktechltd@gmail.com>
+# @copyright 2026 Rooibok Technologies. All rights reserved.
+name: Python Backend CI
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'services/**'
+      - 'libs/**'
+      - 'infra/**'
+      - '.github/workflows/python-ci.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'services/**'
+      - 'libs/**'
+      - 'infra/**'
+
+jobs:
+  django-api:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/django-api
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: forus
+          POSTGRES_PASSWORD: forus
+          POSTGRES_DB: forus
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U forus"
+          --health-interval 10s --health-timeout 5s --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s --health-timeout 5s --health-retries 5
+    env:
+      DEBUG: 'true'
+      DB_HOST: localhost
+      DB_PORT: '5432'
+      REDIS_URL: redis://localhost:6379/0
+      DJANGO_SECRET_KEY: ci-test-key
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install
+        run: pip install -e '.[dev]'
+      - name: Lint (ruff)
+        run: ruff check .
+      - name: Test (pytest)
+        run: pytest
+
+  fastapi-rt:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/fastapi-rt
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: forus
+          POSTGRES_PASSWORD: forus
+          POSTGRES_DB: forus
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U forus"
+          --health-interval 10s --health-timeout 5s --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s --health-timeout 5s --health-retries 5
+    env:
+      DATABASE_URL: postgresql://forus:forus@localhost:5432/forus
+      REDIS_URL: redis://localhost:6379/0
+      DJANGO_SECRET_KEY: ci-test-key
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install
+        run: pip install -e '.[dev]'
+      - name: Lint (ruff)
+        run: ruff check .
+      - name: Test (pytest)
+        run: pytest

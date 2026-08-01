@@ -1,3 +1,7 @@
+/**
+ * @author Bodo Desderio <rooiboktechltd@gmail.com>
+ * @copyright 2026 Rooibok Technologies. All rights reserved.
+ */
 import { View, Text, Image, TouchableOpacity, Dimensions, StyleSheet, Alert, ActivityIndicator, ScrollView } from 'react-native';
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'expo-router';
@@ -17,8 +21,7 @@ import KeyboardAwareScrollView from '../../components/KeyboardAwareView';
 import { useAuth } from '../../context/authContext';
 import { useUser } from '../../context/userContext';
 import ToastMessage from '../../components/ToastMessage';
-import { uploadToCloudinarySigned } from '../../services/cloudinaryUpload';
-import { API_BASE_URL } from '../../services/api';
+import { uploadImage } from '../../services/uploadService';
 
 const { width } = Dimensions.get("window");
 
@@ -79,19 +82,17 @@ const ProfileUpdateScreen = () => {
         }
     }, [user, form]);
 
-    // Function to upload image to Cloudinary (signed)
-    const uploadImageToCloudinary = async (imageUri: string) => {
+    // Upload the profile image to Cloudflare R2 (via the Django /api/upload path).
+    const uploadProfileImage = async (imageUri: string) => {
         try {
             setImageUploading(true);
-            // Replace with your backend endpoint
-            const backendSignatureUrl = `${API_BASE_URL}/cloudinary-signature`;
-            const secureUrl = await uploadToCloudinarySigned(imageUri, backendSignatureUrl);
+            const secureUrl = await uploadImage(imageUri, 'profile.jpg');
             form.setValue('profileImage', secureUrl);
             setLocalImageUri(null);
             Alert.alert('Success', 'Profile image uploaded successfully!');
             return secureUrl;
         } catch (error: any) {
-            console.error('Cloudinary upload error:', error);
+            console.error('Profile image upload error:', error);
             Alert.alert('Upload Error', 'Failed to upload image. Please try again.');
             setLocalImageUri(null);
             return null;
@@ -143,7 +144,7 @@ const ProfileUpdateScreen = () => {
 
             if (!result.canceled && result.assets[0]) {
                 setLocalImageUri(result.assets[0].uri); // Show immediate preview
-                await uploadImageToCloudinary(result.assets[0].uri);
+                await uploadProfileImage(result.assets[0].uri);
             }
         } catch (error) {
             console.error('Camera error:', error);
@@ -162,7 +163,7 @@ const ProfileUpdateScreen = () => {
 
             if (!result.canceled && result.assets[0]) {
                 setLocalImageUri(result.assets[0].uri); // Show immediate preview
-                await uploadImageToCloudinary(result.assets[0].uri);
+                await uploadProfileImage(result.assets[0].uri);
             }
         } catch (error) {
             console.error('Image picker error:', error);

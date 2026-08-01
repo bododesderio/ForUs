@@ -1,3 +1,7 @@
+/**
+ * @author Bodo Desderio <rooiboktechltd@gmail.com>
+ * @copyright 2026 Rooibok Technologies. All rights reserved.
+ */
 import React from 'react';
 import { Tabs } from "expo-router";
 import Ionicons from '@expo/vector-icons/Ionicons';
