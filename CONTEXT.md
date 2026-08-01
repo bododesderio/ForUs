@@ -6,7 +6,19 @@
 Last updated: 2026-08-01
 
 ## Current task
-**PHASE R COMPLETE + Stillwater backend slices done (P2, P4, notifications). 110 tests green.**
+**⏸ PAUSED 2026-08-01 (Fri) — RESUME MONDAY. Phase R complete + Stillwater backend slices
+(P2, P3, P4, P8, P9-audit) + notification wiring + Cloudinary/MinIO fully removed. 125 tests green, stack live.**
+
+> **▶ RESUME MONDAY — pick one:**
+> - **P5 payments (Pesapal)** — needs sandbox creds + merchant onboarding (start the 1–2wk approval now).
+> - **P6 video (Agora)** — needs Agora app ID / certificate.
+> - **P7 crisis SOS / moderation** — needs your design intent first (what should "SOS" *do*?).
+> - **Frontend on a device** — feed UI (P4), chat runtime-verify (R4c-2), therapist screens (P8), SEC-9 (expo-secure-store). Run `node dev.js`.
+> - **P9 admin** — Next.js admin-web app + monorepo (backend RBAC + audit log already done).
+> - Quick backend win: reconcile P8 earnings against real payouts once P5 lands.
+> Branch `feat/backend-r0-scaffold` (PR #1). All work pushed & green. Per-slice detail in `.claude/MEMORY.md`.
+> To bring the stack up: `docker compose -f infra/docker-compose.yml up -d`. Tests: see MEMORY env vars.
+
 On the Python backend, beyond Phase R: **P4 community feed** (`/api/community/*` on R1 models —
 feed/post/like/comment, pseudonymous, soft-delete), **P2 forgot-password + email verification**
 (`/api/auth/forgot-password`,`/reset-password`,`/verify-email/*`; Resend via `core/email.py`;

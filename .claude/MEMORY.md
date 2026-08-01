@@ -229,3 +229,14 @@ Created: 2026-07-27
 - **Distinct from `activities`** (user-facing timeline) — audit = security/compliance trail.
 - **Verified:** 4 tests (user.delete audited via API, event.create audited, endpoint admin-only+paginated+filter, system-actor null). Full 125 (114 django + 11 fastapi), ruff+migrations clean. Admin registry now has AuditLog + SessionNote.
 - **Remaining P9:** Next.js admin-web (apps/admin-web, own port lane) + monorepo restructure + fuller RBAC — frontend/new-surface, needs runtime.
+
+## [2026-08-01] — 🏁 SESSION WRAP (paused, resume Monday)
+- **Delivered this session (branch feat/backend-r0-scaffold, PR #1, all pushed & green):**
+  - **Phase R COMPLETE (R0–R7):** Node/Express → Django + FastAPI; realtime chat on FastAPI WS + Redis pub/sub; media→R2; Celery jobs; Node backend DELETED; Stream Chat removed (frontend chat rewritten native, tsc-clean).
+  - **Stillwater backend slices on Python:** P2 (forgot-password + email verification, Resend), P3 (profile stats + rich check-in + search + streak task; new schema), P4 (community feed), P8 (therapist tools: session notes/earnings/clients/mood-trend; new schema), P9-partial (audit log). Plus appointment→notification wiring.
+  - **Cloudinary + MinIO fully removed** repo-wide (product + config + docs): repointed profileUpdate.tsx + resourceLibrary.tsx to R2 uploadService, deleted cloudinaryUpload.ts + dead backend.yml CI; `grep -rniE 'cloudinary|minio'` = ZERO.
+- **State:** 125 tests green (114 django + 11 fastapi), ruff + migrations clean, frontend chat/upload tsc = baseline (1 pre-existing unrelated event-data.ts error; ~242 pre-existing app-wide strict errors are NOT ours — app runs via Metro). Live compose stack healthy on :10000.
+- **Test cmd:** django — `cd services/django-api && DEBUG=true DB_HOST=localhost DB_PORT=10010 DB_NAME=forus DB_USER=forus DB_PASSWORD=forus REDIS_URL=redis://localhost:10011/0 DJANGO_SECRET_KEY=ci-test-key .venv... pytest -o addopts=""`. fastapi — `cd services/fastapi-rt && DATABASE_URL=postgresql://forus:forus@localhost:10010/forus REDIS_URL=redis://localhost:10011/0 pytest -o addopts=""`. venv at repo-root /.venv (uv).
+- **BLOCKED (need input/creds/device):** P5 Pesapal (creds+onboarding), P6 Agora (creds), P7 crisis (design intent), all frontend screens + SEC-9 (device), P9 Next.js admin-web (new surface).
+- **Standing:** PR CI red = GitHub Actions billing lock (not code). Earlier commits carry Claude attribution on GitHub (pre-session; not rewritten — destructive). R2 creds in infra/.env still blank (needed to actually store files).
+- **RESUME MONDAY:** see CONTEXT.md top banner. Recommend: kick off Pesapal onboarding (long pole) + do frontend on a device.
