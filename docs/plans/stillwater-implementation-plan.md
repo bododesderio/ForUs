@@ -339,6 +339,7 @@ shows week grid, portrait falls back to phone layout.
 ---
 
 # Phase 9 · Admin — desktop web (Next.js) + slim Expo admin + RBAC + monorepo
+> **partial backend ✅ 2026-08-01 (Django):** audit log — `audit_logs` table + core.audit.record_audit() wired into admin destructive/sensitive actions (user/consultant delete, event create/update/delete, send-notification) + GET /api/audit-log (admin-only, paginated, filter by action/actor_id) + read-only Django admin. RBAC otherwise = IsAdminRole + Django admin. Remaining P9: Next.js admin-web app + monorepo (frontend/new surface).
 **Blocked-by:** Phases 0, 1, 5 (billing data), 7 (moderation). **Est: 18–22 person-days.**
 ### Monorepo restructure (introduced here):
 ```

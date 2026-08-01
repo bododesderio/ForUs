@@ -20,6 +20,7 @@ from rest_framework.views import APIView
 from accounts.models import Role, User
 from accounts.services import record_activity
 from accounts.user_services import consultant_detail_payload
+from core.audit import client_ip, record_audit
 from core.permissions import IsAdminRole
 
 from .models import Event, Resource
@@ -52,6 +53,7 @@ class EventCreateView(APIView):
             )
         event = Event.objects.create(**ser.validated_data)
         record_activity(request.user, "event_create", f"Created event: {event.title}")
+        record_audit(request.user, "event.create", target_type="Event", target_id=event.id, ip=client_ip(request))
         return Response(
             {"success": True, "message": "Event created successfully", "id": str(event.id)},
             status=status.HTTP_200_OK,
@@ -120,6 +122,7 @@ class EventDeleteView(APIView):
             return Response(
                 {"success": False, "message": "Event not found"}, status=status.HTTP_400_BAD_REQUEST
             )
+        record_audit(request.user, "event.delete", target_type="Event", target_id=pk, ip=client_ip(request))
         return Response(
             {"success": True, "message": "Event deleted successfully"}, status=status.HTTP_200_OK
         )
@@ -144,6 +147,7 @@ class EventUpdateView(APIView):
         for field, value in ser.validated_data.items():
             setattr(event, field, value)
         event.save()
+        record_audit(request.user, "event.update", target_type="Event", target_id=pk, ip=client_ip(request))
         return Response(
             {"success": True, "message": "Event updated successfully", "updatedEvent": EventSerializer(event).data},
             status=status.HTTP_200_OK,

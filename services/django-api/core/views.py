@@ -3,6 +3,8 @@
 """Liveness/readiness probe. Gateway exposes it at /api/health."""
 from __future__ import annotations
 
+import math
+
 import redis
 from django.conf import settings
 from django.db import connection
@@ -14,6 +16,8 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from .media import max_upload_bytes, sniff_content_type, store
+from .models import AuditLog
+from .permissions import IsAdminRole
 
 
 def _check_database() -> bool:
@@ -79,3 +83,49 @@ class UploadView(APIView):
     @staticmethod
     def _bad(message: str) -> Response:
         return Response({"success": False, "message": message}, status=status.HTTP_400_BAD_REQUEST)
+
+
+def _audit_payload(entry: AuditLog) -> dict:
+    return {
+        "id": str(entry.id),
+        "action": entry.action,
+        "actor": {"id": str(entry.actor_id), "email": entry.actor.email} if entry.actor_id else None,
+        "target_type": entry.target_type or None,
+        "target_id": entry.target_id,
+        "metadata": entry.metadata,
+        "ip_address": entry.ip_address,
+        "created_at": entry.created_at.isoformat() if entry.created_at else None,
+    }
+
+
+class AuditLogView(APIView):
+    """GET /api/audit-log — the sensitive-action trail (admin only, paginated, filterable)."""
+
+    permission_classes = [IsAdminRole]
+
+    def get(self, request: Request) -> Response:
+        qs = AuditLog.objects.select_related("actor").order_by("-created_at")
+        if request.query_params.get("action"):
+            qs = qs.filter(action=request.query_params["action"])
+        if request.query_params.get("actor_id"):
+            qs = qs.filter(actor_id=request.query_params["actor_id"])
+        try:
+            page = max(int(request.query_params.get("page", 1)), 1)
+            limit = min(max(int(request.query_params.get("limit", 50)), 1), 200)
+        except (TypeError, ValueError):
+            page, limit = 1, 50
+        total = qs.count()
+        offset = (page - 1) * limit
+        return Response(
+            {
+                "success": True,
+                "logs": [_audit_payload(e) for e in qs[offset : offset + limit]],
+                "pagination": {
+                    "page": page,
+                    "limit": limit,
+                    "total": total,
+                    "totalPages": math.ceil(total / limit) if limit else 0,
+                },
+            },
+            status=status.HTTP_200_OK,
+        )

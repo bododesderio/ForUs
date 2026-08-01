@@ -16,6 +16,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from content.models import Notification
+from core.audit import client_ip, record_audit
 from core.permissions import IsAdminRole
 
 from .models import Profile, Role, User
@@ -114,6 +115,7 @@ class DeleteUserView(APIView):
         if user is None:
             return _err("User not found")
         user.delete()  # soft delete + deactivate
+        record_audit(request.user, "user.delete", target_type="User", target_id=pk, ip=client_ip(request))
         return _ok({"success": True, "message": "User deleted."})
 
 
@@ -125,6 +127,7 @@ class DeleteConsultantView(APIView):
         if user is None:
             return _err("Consultant not found")
         user.delete()
+        record_audit(request.user, "consultant.delete", target_type="User", target_id=pk, ip=client_ip(request))
         return _ok({"success": True, "message": "Consultant deleted."})
 
 
@@ -163,6 +166,9 @@ class _SendNotificationBase(APIView):
             return _err(f"{self.id_field}, title, and body are required")
         Notification.objects.create(
             recipient_id=recipient_id, title=title, body=body, data=request.data.get("data") or {}
+        )
+        record_audit(
+            request.user, "notification.send", target_type="User", target_id=recipient_id, ip=client_ip(request)
         )
         return _ok({"success": True, "message": "Notification queued"})
 

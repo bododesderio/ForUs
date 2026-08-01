@@ -220,3 +220,12 @@ Created: 2026-07-27
 - **Gotcha:** earnings month filter (appointment_datetime__date >= 1st-of-month) — test dated appts "yesterday" but today=Aug 1 → prev month → 0. Date fixtures within the period.
 - **Verified:** 6 tests (notes upsert/owner-gate/role-gate, earnings math all-pending, clients+counts, mood-trend privacy, auth). Full 121 (110 django + 11 fastapi), ruff clean, migrations clean.
 - **P5-dependent follow-up:** earnings must reconcile against real payouts/transactions (Pesapal disbursements) — replace pending/settled estimate when P5 lands. Screens (SOAP editor, earnings chart, tablet) B-1 + Expo runtime.
+
+## [2026-08-01] — Stillwater P9 (partial): audit log
+- **Schema:** audit_logs table (core.AuditLog: actor FK SET_NULL nullable, action varchar, target_type, target_id varchar, metadata jsonb, ip_address; indexes action/actor/-created_at). core/migrations/0001_initial (core's FIRST concrete model — was abstract-only). Reversible, verified.
+- **core/audit.py:** record_audit(actor, action, *, target_type, target_id, metadata, ip) — best-effort (never breaks the action); system actor (None/anon) → null. client_ip(request) honors X-Forwarded-For (gateway sets it).
+- **Wired into sensitive admin actions:** accounts DeleteUserView (user.delete), DeleteConsultantView (consultant.delete), _SendNotificationBase (notification.send); content EventCreate/Update/Delete (event.create/update/delete). All pass ip=client_ip(request).
+- **Read:** GET /api/audit-log (core.AuditLogView, IsAdminRole) — paginated {logs,pagination}, filter ?action=&actor_id=, select_related(actor) no N+1. core/admin.py registers AuditLog read-only (has_add/change=False, append-only).
+- **Distinct from `activities`** (user-facing timeline) — audit = security/compliance trail.
+- **Verified:** 4 tests (user.delete audited via API, event.create audited, endpoint admin-only+paginated+filter, system-actor null). Full 125 (114 django + 11 fastapi), ruff+migrations clean. Admin registry now has AuditLog + SessionNote.
+- **Remaining P9:** Next.js admin-web (apps/admin-web, own port lane) + monorepo restructure + fuller RBAC — frontend/new-surface, needs runtime.
