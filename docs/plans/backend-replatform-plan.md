@@ -89,7 +89,7 @@ Admin/consultant route stubs stay stubs (Stillwater Phase 9 fills them).
   **Rollback:** per-group gateway route back to Node (this is why we port group-by-group).
 
 ## R4 · Realtime chat on FastAPI  — 🚧 IN PROGRESS (R4a+R4b done 2026-08-01) · blocked-by: R1 (R3 recommended)
-> R4a: Django chat REST (SEC-2). R4b: FastAPI WS /ws — ticket auth (SEC-4), persist-then-broadcast (BUG-7), Redis pub/sub fan-out (PERF-3..6), membership on send+join_room (SEC-2). Stream dropped server-side. Remaining: R4c frontend repoint + remove stream-chat deps.
+> R4a: Django chat REST (SEC-2). R4b: FastAPI WS /ws (SEC-4/BUG-7/PERF-3..6/SEC-2). R4c-1: ChatContext.js → ticket flow + message-shape normalize + fetchRooms/loadHistory. Remaining R4c-2 (needs Expo runtime): rewrite chat SCREENS off Stream components, remove stream-chat-* deps.
 - Port `/api/chat` room/message REST to Django; move the realtime layer (currently `ws.js` + Stream
   Chat) to **FastAPI WebSockets** at `/ws/**`, fanning out via **Redis pub/sub** (multi-worker).
   Persist to `chat_messages`/`message_reactions`. **Drop Stream Chat** (`getstream`, `stream-chat`).

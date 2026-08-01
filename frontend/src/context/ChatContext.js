@@ -30,13 +30,47 @@ export const ChatProvider = ({ children }) => {
         return `${wsUrl}/ws`;
     };
 
+    // Normalize a message from either casing (WS new_message / REST + room_history)
+    // to a single camelCase shape the UI can render consistently.
+    const normalizeMessage = (m) => ({
+        id: m.id,
+        roomId: m.roomId ?? m.room_id,
+        userId: m.userId ?? m.user_id,
+        text: m.text,
+        attachments: m.attachments ?? [],
+        parentId: m.parentId ?? m.parent_id ?? null,
+        createdAt: m.createdAt ?? m.created_at,
+        username: m.username,
+        firstName: m.firstName ?? m.first_name,
+        lastName: m.lastName ?? m.last_name,
+        profileImage: m.profileImage ?? m.profile_image,
+    });
+
+    const authFetch = async (path, opts = {}) => {
+        const token = await getAccessToken();
+        return fetch(`${API_BASE_URL}${path}`, {
+            ...opts,
+            headers: { ...(opts.headers || {}), Authorization: `Bearer ${token}` },
+        });
+    };
+
     const connect = useCallback(async () => {
         try {
             const token = await getAccessToken();
             const userData = await getStoredUserData();
             if (!token || !userData) return;
 
-            const url = `${getWsUrl()}?token=${token}`;
+            // SEC-4: exchange the bearer token for a short-lived single-use WS ticket
+            // so no long-lived token ever appears in the WebSocket URL / proxy logs.
+            const ticketRes = await authFetch('/chat/token');
+            if (!ticketRes.ok) {
+                setError('Failed to authorize chat');
+                return;
+            }
+            const { ticket } = await ticketRes.json();
+            if (!ticket) return;
+
+            const url = `${getWsUrl()}?ticket=${encodeURIComponent(ticket)}`;
             const ws = new WebSocket(url);
             wsRef.current = ws;
 
@@ -72,28 +106,29 @@ export const ChatProvider = ({ children }) => {
 
     const handleEvent = (data, currentUser) => {
         switch (data.type) {
-            case 'new_message':
+            case 'new_message': {
+                const message = normalizeMessage(data.message);
                 setMessages(prev => {
-                    const roomMessages = prev[data.message.roomId] || [];
-                    const exists = roomMessages.some(m => m.id === data.message.id);
-                    if (exists) return prev;
-                    return { ...prev, [data.message.roomId]: [...roomMessages, data.message] };
+                    const roomMessages = prev[message.roomId] || [];
+                    if (roomMessages.some(m => m.id === message.id)) return prev;
+                    return { ...prev, [message.roomId]: [...roomMessages, message] };
                 });
                 // Show local notification if message is from someone else
-                if (data.message.userId !== currentUser?.id) {
+                if (String(message.userId) !== String(currentUser?.id)) {
                     Notifications.scheduleNotificationAsync({
                         content: {
                             title: 'New Message',
-                            body: data.message.text,
-                            data: { roomId: data.message.roomId },
+                            body: message.text,
+                            data: { roomId: message.roomId },
                         },
                         trigger: null,
                     }).catch(() => {});
                 }
                 break;
+            }
 
             case 'room_history':
-                setMessages(prev => ({ ...prev, [data.roomId]: data.messages }));
+                setMessages(prev => ({ ...prev, [data.roomId]: (data.messages || []).map(normalizeMessage) }));
                 break;
 
             case 'typing':
@@ -143,6 +178,32 @@ export const ChatProvider = ({ children }) => {
         wsRef.current.send(JSON.stringify({ type: 'read_receipt', roomId, messageId }));
     }, []);
 
+    // REST helpers (replace the Stream client for room list + history load).
+    const fetchRooms = useCallback(async () => {
+        try {
+            const res = await authFetch('/chat/rooms');
+            if (!res.ok) return [];
+            const data = await res.json();
+            return data.rooms || [];
+        } catch {
+            return [];
+        }
+    }, []);
+
+    const loadHistory = useCallback(async (roomId, before = null) => {
+        try {
+            const q = before ? `?before=${encodeURIComponent(before)}` : '';
+            const res = await authFetch(`/chat/rooms/${roomId}/messages${q}`);
+            if (!res.ok) return [];
+            const data = await res.json();
+            const history = (data.messages || []).map(normalizeMessage);
+            setMessages(prev => ({ ...prev, [roomId]: history }));
+            return history;
+        } catch {
+            return [];
+        }
+    }, []);
+
     const disconnect = useCallback(() => {
         clearTimeout(reconnectTimer.current);
         wsRef.current?.close();
@@ -168,6 +229,8 @@ export const ChatProvider = ({ children }) => {
             sendTyping,
             joinRoom,
             sendReadReceipt,
+            fetchRooms,
+            loadHistory,
             connect,
             disconnect,
         }}>

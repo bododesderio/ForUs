@@ -6,13 +6,16 @@
 Last updated: 2026-08-01
 
 ## Current task
-**Phase R4 IN PROGRESS — R4a+R4b done (backend chat); only R4c (frontend) left.**
-R4a: chat REST on Django (rooms/messages/join, SEC-2). R4b: **FastAPI WebSocket** at `/ws` —
-ticket auth (SEC-4, `GET /api/chat/token` issues a 30s single-use Redis ticket), persist-then-
-broadcast (BUG-7), **Redis pub/sub** fan-out across workers (PERF-3..6), membership checks on
-send + join_room history (SEC-2). Stream Chat fully dropped server-side. 78 tests green
-(67 Django + 11 FastAPI; realtime repo layer verified against the compose DB).
-**R4c:** repoint `ChatContext.js` WS URL + swap token→ticket flow; remove `stream-chat-*` deps.
+**Phase R4 IN PROGRESS — R4a+R4b done, R4c-1 done; R4c-2 (chat UI screens) remains.**
+R4a: chat REST on Django. R4b: FastAPI WS `/ws` (ticket auth SEC-4, persist-then-broadcast BUG-7,
+Redis pub/sub fan-out PERF-3..6, membership SEC-2). **R4c-1:** `ChatContext.js` now uses the ticket
+flow (`GET /api/chat/token` → `wss://…/ws?ticket=`), normalizes message casing, and exposes
+`fetchRooms`/`loadHistory` REST helpers. Stream fully dropped server-side; client no longer puts a
+token in the WS URL. **R4c-2 (remaining, needs Expo runtime):** the chat *screens*
+(`ChatRoomScreen.tsx`, `ChatComponent.tsx`, `CustomMessage.tsx`, `(users|consultants|tabs)/chat.tsx`,
+`_layout.tsx`) still render via Stream Chat components — rewrite them onto the native context, then
+remove `stream-chat`/`stream-chat-expo`/`stream-chat-react-native*` from `package.json`.
+78 backend tests green. **⚠ Cannot run Expo/RN in this env — R4c-2 UI needs a runtime to verify.**
 
 ## Superseded — Phase R3 COMPLETE (next up R4 realtime chat)
 Express/Node → Django (DRF, core/CRUD/admin/payments) + FastAPI (realtime chat,
@@ -157,12 +160,13 @@ Celery 10003, admin-web 10004, Node(transitional) 10005, Postgres 10010, Redis 1
 - Ports: never hardcode — derive from lane 10000 (`ports` skill + `~/.claude/PORTS.md`).
 
 ## Next steps (finish R4 → R5)
-1. **R4c — frontend.** Repoint `ChatContext.js`: connect `wss://gateway/ws?ticket=<t>` where the
-   ticket comes from `GET /api/chat/token`; drop the Stream client init; message send/typing/receipt
-   over the native WS event protocol (send_message/typing/read_receipt/join_room). Load history from
-   `GET /api/chat/rooms/:id/messages` (or the join_room `room_history` frame). Remove
-   `stream-chat`/`stream-chat-expo`/`stream-chat-react-native*` from `package.json`. (Also SEC-9:
-   move tokens to `expo-secure-store` — can ride along here or Stillwater P0.)
+1. **R4c-2 — chat UI screens (needs Expo runtime).** Rewrite `ChatRoomScreen.tsx` + `ChatComponent.tsx`
+   + `CustomMessage.tsx` + `(users|consultants|tabs)/chat.tsx` + `_layout.tsx` off Stream components
+   onto `useChatContext()` (native): room list via `fetchRooms()`, history via `loadHistory(roomId)`
+   or the `room_history` frame, `sendMessage/sendTyping/joinRoom/sendReadReceipt`, typing indicators
+   from `typingUsers`. Then remove `stream-chat`/`stream-chat-expo`/`stream-chat-react-native*` from
+   `package.json` and any `OverlayProvider`/Stream client wiring. Verify by running the app. (Bundle
+   SEC-9: move tokens to `expo-secure-store`.)
 2. **R5 — media → Cloudflare R2** (django-storages/boto3; port `/api/upload` + drop Cloudinary).
 3. Start **Pesapal merchant onboarding** (long pole, ~1–2 wk approval) — in parallel.
 4. After Phase R lands → Stillwater 0–10 on the Python backend.

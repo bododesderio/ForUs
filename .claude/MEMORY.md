@@ -148,3 +148,10 @@ Created: 2026-07-27
 - **Tests:** django chat/tests/test_ticket.py (needs redis → compose 10011). fastapi tests/test_chat_manager.py (unit, no infra), test_chat_ws.py (WS no-ticket reject via TestClient + guarded repo integration against compose DB 10010/redis 10011, seeded in a rolled-back transaction). CI: integration test SKIPS (fastapi CI job has no migrated schema); auth+unit run.
 - **Verified:** 78 tests (67 django + 11 fastapi), ruff clean. compose redis started (10011).
 - **Resume R4c (frontend):** ChatContext.js → wss://gateway/ws?ticket=(GET /api/chat/token); native WS protocol; remove stream-chat* deps. Then R5 media→R2.
+
+## [2026-08-01] — Phase R4c-1: ChatContext.js (native WS client)
+- **Surprise:** ChatContext.js was ALREADY a native WebSocket client (not Stream). The Stream dependency is in the SCREENS (ChatRoomScreen.tsx uses `client.deleteMessage`, Stream <Channel>/<MessageList>; _layout OverlayProvider). So R4c splits: R4c-1 context (done), R4c-2 screen rewrite + dep removal (remaining, needs Expo runtime).
+- **R4c-1 changes (ChatContext.js):** connect() now GET /api/chat/token (Bearer) → wss://gateway/ws?ticket= (SEC-4, no token in URL). normalizeMessage() maps snake_case (my backend) ↔ camelCase for new_message + room_history so UI renders consistently. Added authFetch, fetchRooms() (GET /chat/rooms), loadHistory(roomId,before) (GET /chat/rooms/:id/messages) — exposed in context so screens can drop the Stream client. Event protocol already matched (send_message/typing/read_receipt/join_room).
+- **CANNOT run Expo/RN here** — .tsx screen rewrite + `stream-chat-*` dep removal deferred (removing deps before screens migrate would break the build). node --check passed on ChatContext.js.
+- **R4c-2 files to migrate:** ChatRoomScreen.tsx, ChatComponent.tsx, CustomMessage.tsx, (users|consultants|tabs)/chat.tsx, _layout.tsx. Deps to remove: stream-chat-expo, stream-chat-react-native, stream-chat-react-native-core (package.json:65-67). Bundle SEC-9 (expo-secure-store for tokens).
+- **Resume:** R4c-2 (with app runnable) or R5 (media→R2). Backend chat is complete + tested.
