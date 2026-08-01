@@ -148,6 +148,9 @@ class ConsultantDetails(UUIDModel):
     )
     rating = models.FloatField(default=0)
     is_approved = models.BooleanField(default=False)
+    # Marketplace per-session price (P8 earnings; settled via P5 disbursements).
+    session_rate = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    currency = models.CharField(max_length=3, default="UGX")
 
     class Meta:
         db_table = "consultant_details"

@@ -321,6 +321,7 @@ escalate flag to admin queue (`moderation_flags`).
 ---
 
 # Phase 8 · Therapist tools + tablet
+> **backend ✅ DONE 2026-08-01 (Django):** new `consultant` app + `session_notes` table + consultant_details(+session_rate,+currency). GET/POST /api/consultant/notes/:appointment_id (SOAP, owner-gated) · /earnings?period (from rate; 25% fee; all pending until P5 disbursements) · /clients · /clients/:id/mood-trend (relationship-gated). IsConsultantRole. 6 tests. Screens B-1; earnings reconciliation needs P5.
 **Blocked-by:** Phases 0, 1, 5. **Est: 10–12 person-days.**
 ### Phone screens ⟨design unresolved — B‑1⟩: `ScreenTNotes` (SOAP editor, auto-save, share-with-client
 toggle → `session_notes`), Earnings tab (replaces stub `(consultants)/index.tsx` region: monthly bar

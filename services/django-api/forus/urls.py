@@ -18,6 +18,7 @@ urlpatterns = [
     path("api/appointments/", include("appointments.urls")),
     path("api/chat/", include("chat.urls")),
     path("api/community/", include("community.urls")),
+    path("api/consultant/", include("consultant.urls")),
     path("api/", include("content.urls")),  # events + resources
     path("api/", include("core.urls")),
 ]

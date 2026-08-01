@@ -213,3 +213,10 @@ Created: 2026-07-27
 - **Verified:** 5 P3 tests (rich check-in, stats streak/sessions/minutes/trend, streak task, auth, search federation). Full: 115 tests (104 django + 11 fastapi), ruff clean.
 - **NOTE:** running django container is pre-P3 (old image) — new endpoints need a rebuild to serve live; tests are authoritative. Screens (ScreenHome/CheckIn/Library/Player/Profile stats) are B-1 design-blocked + need Expo runtime.
 - **Next:** P7 crisis/moderation (new schema) or P8-10, or external P5/P6. Frontend needs device.
+
+## [2026-08-01] — Stillwater P8 backend: therapist tools (consultant app)
+- **New `consultant` app** (INSTALLED_APPS). Schema: session_notes table (SessionNote: OneToOne appointment, consultant FK, SOAP subjective/objective/assessment/plan text, shared_with_client bool; consultant/migrations/0001) + consultant_details += session_rate(Decimal 12,2 default 0), currency(char default UGX) (accounts/migrations/0003). Reversible, verified.
+- **Endpoints (/api/consultant/, all IsConsultantRole):** GET/POST notes/<appointment_id> (SOAP upsert, owner-of-appointment gated, one note per appt via update_or_create). GET earnings?period=month|year (services.earnings: completed appts in period × session_rate → gross; 25% PLATFORM_FEE_RATE; net; settled='0.00' + pending=net — NO real disbursements until P5; amounts as strings, Decimal). GET clients (distinct users w/ appts + completed session_count). GET clients/<user_id>/mood-trend?days (relationship-gated privacy: 403 if no appt with that user).
+- **Gotcha:** earnings month filter (appointment_datetime__date >= 1st-of-month) — test dated appts "yesterday" but today=Aug 1 → prev month → 0. Date fixtures within the period.
+- **Verified:** 6 tests (notes upsert/owner-gate/role-gate, earnings math all-pending, clients+counts, mood-trend privacy, auth). Full 121 (110 django + 11 fastapi), ruff clean, migrations clean.
+- **P5-dependent follow-up:** earnings must reconcile against real payouts/transactions (Pesapal disbursements) — replace pending/settled estimate when P5 lands. Screens (SOAP editor, earnings chart, tablet) B-1 + Expo runtime.

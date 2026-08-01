@@ -59,6 +59,7 @@ INSTALLED_APPS = [
     "content",
     "chat",
     "community",
+    "consultant",
 ]
 
 # Custom identity model — email login, role-based, UUID PK. Must be set before the
